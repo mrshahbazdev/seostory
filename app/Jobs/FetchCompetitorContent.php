@@ -25,50 +25,46 @@ class FetchCompetitorContent implements ShouldQueue
         curl_setopt($ch, CURLOPT_URL, $url);
         curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
         curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
+        // Nike jaisi sites ke liye headers bohat zaroori hain
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+            'Accept-Language: en-US,en;q=0.5',
+            'Upgrade-Insecure-Requests: 1',
+            'Cache-Control: max-age=0',
+        ]);
         curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
         curl_setopt($ch, CURLOPT_TIMEOUT, 30);
         curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
-        curl_setopt($ch, CURLOPT_ENCODING, ""); // Compression handle karne ke liye
+        curl_setopt($ch, CURLOPT_ENCODING, ""); 
 
         $html = curl_exec($ch);
         $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        $error = curl_error($ch);
         curl_close($ch);
 
         if ($html && $httpCode == 200) {
-            // 1. Pehle Scripts, Styles aur SVG ko mukammal nikaal dein
-            $cleanText = preg_replace([
-                '/<script\b[^>]*>(.*?)<\/script>/is',
-                '/<style\b[^>]*>(.*?)<\/style>/is',
-                '/<svg\b[^>]*>(.*?)<\/svg>/is',
-                '/<noscript\b[^>]*>(.*?)<\/noscript>/is',
-                '//is' // HTML Comments nikaalne ke liye
-            ], '', $html);
-
-            // 2. HTML Tags hatayen
-            $cleanText = strip_tags($cleanText);
-
-            // 3. HTML Entities (jaise &nbsp; या &amp;) ko normal text mein badlein
-            $cleanText = html_entity_decode($cleanText);
-
-            // 4. Extra spaces, tabs aur new lines ko single space mein badlein
-            $cleanText = preg_replace('/\s+/', ' ', $cleanText);
+            // SAFE CLEANING: Sirf Script aur Style hatayen, baki rehne den
+            $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html);
+            $html = preg_replace('/<style\b[^>]*>(.*?)<\/style>/is', '', $html);
             
-            // 5. Final Trim
+            $cleanText = strip_tags($html);
+            $cleanText = html_entity_decode($cleanText);
+            $cleanText = preg_replace('/\s+/', ' ', $cleanText);
             $cleanText = trim($cleanText);
 
-            // Agar cleaning ke baad kafi text bacha hai
-            if (strlen($cleanText) > 150) {
+            if (strlen($cleanText) > 100) {
                 $this->competitor->update([
                     'raw_content' => substr($cleanText, 0, 15000), 
                     'status' => 'fetching_completed'
                 ]);
-                Log::info("Fetch & Clean Successful for: " . $url . " (Cleaned Size: " . strlen($cleanText) . ")");
+                Log::info("Success: Data fetched for " . $url);
             } else {
-                Log::warning("Content too short after cleaning for: " . $url);
+                Log::warning("Cleaning Error: Content too short for " . $url);
                 $this->competitor->update(['status' => 'failed']);
             }
         } else {
-            Log::error("CURL Failed for $url. HTTP Code: $httpCode");
+            Log::error("Fetch Failed for $url. Code: $httpCode. Error: $error");
             $this->competitor->update(['status' => 'failed']);
         }
     }
