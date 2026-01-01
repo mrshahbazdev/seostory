@@ -20,44 +20,39 @@ class FetchCompetitorContent implements ShouldQueue
     public function handle(): void
     {
         $this->competitor->update(['status' => 'fetching']);
+        $url = $this->competitor->website_url;
 
-        try {
-            // High-level Browser Headers
-            $response = Http::withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-                'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
-                'Accept-Language' => 'en-US,en;q=0.5',
-                'Referer' => 'https://www.google.com/',
-            ])
-            ->withOptions(['allow_redirects' => true, 'verify' => false]) 
-            ->timeout(30)
-            ->get($this->competitor->website_url);
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
+        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
+        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
+        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); // SSL issues bypass karne ke liye
 
-            if ($response->successful()) {
-                $html = $response->body();
-                
-                // Script aur Style tags ko nikalna zaroori hai
-                $cleanText = preg_replace('/<(script|style)\b[^>]*>(.*?)<\/\1>/is', '', $html);
-                $cleanText = strip_tags($cleanText);
-                // Extra lines aur spaces khatam karna
-                $cleanText = preg_replace('/\s+/', ' ', $cleanText);
+        $html = curl_exec($ch);
+        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+        curl_close($ch);
 
-                if (strlen(trim($cleanText)) < 100) {
-                    \Log::error("Content too short for: " . $this->competitor->website_url);
-                    $this->competitor->update(['status' => 'failed']);
-                    return;
-                }
+        if ($html && $httpCode == 200) {
+            // Clean the HTML
+            $cleanText = preg_replace('/<(script|style)\b[^>]*>(.*?)<\/\1>/is', '', $html);
+            $cleanText = strip_tags($cleanText);
+            $cleanText = preg_replace('/\s+/', ' ', $cleanText);
+            $cleanText = trim($cleanText);
 
+            if (strlen($cleanText) > 200) {
                 $this->competitor->update([
-                    'raw_content' => trim($cleanText),
+                    'raw_content' => substr($cleanText, 0, 15000), // Max 15k chars for AI
                     'status' => 'fetching_completed'
                 ]);
+                \Log::info("Fetch Successful for: " . $url . " (Size: " . strlen($cleanText) . ")");
             } else {
-                \Log::error("Fetch Failed. Status: " . $response->status());
+                \Log::warning("Content too short after cleaning for: " . $url);
                 $this->competitor->update(['status' => 'failed']);
             }
-        } catch (\Exception $e) {
-            \Log::error("Fetch Exception: " . $e->getMessage());
+        } else {
+            \Log::error("CURL Failed for $url. HTTP Code: $httpCode");
             $this->competitor->update(['status' => 'failed']);
         }
     }
