@@ -8,7 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Gemini;
+use OpenAI;
 
 class AnalyzeCompetitorAI implements ShouldQueue
 {
@@ -21,30 +21,36 @@ class AnalyzeCompetitorAI implements ShouldQueue
         $this->competitor->update(['status' => 'analyzing']);
 
         try {
-            $client = Gemini::client(env('GEMINI_API_KEY'));
-            
-            $content = substr($this->competitor->raw_content, 0, 10000);
+            $client = OpenAI::client(env('OPENAI_API_KEY'));
 
-            $prompt = "Analyze this competitor's website content and provide: 
-                    1. Value Proposition 
-                    2. Key Products/Services
-                    3. Marketing Strategy
+            $content = substr($this->competitor->raw_content, 0, 8000);
+
+            $prompt = "You are an expert marketing analyst. Analyze the following website content of a competitor:
+                    1. What is their core Value Proposition?
+                    2. List their Key Products or Services.
+                    3. Identify their main Marketing Strategy.
+                    
                     Website Content: " . $content;
 
-            // CORRECT SYNTAX: gemini() method use karein aur model name string mein dein
-            $result = $client->gemini15Flash()->generateContent($prompt);
-            // Agar upar wali line phir bhi error de (package version issue), toh ye use karein:
-            // $result = $client->geminiPro()->generateContent($prompt);
+            $response = $client->chat()->create([
+                'model' => 'gpt-4o-mini',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'You provide professional, concise marketing intelligence reports.'],
+                    ['role' => 'user', 'content' => $prompt],
+                ],
+            ]);
+
+            $analysisResult = $response->choices[0]->message->content;
 
             $this->competitor->update([
-                'metadata' => ['analysis' => $result->text()],
+                'metadata' => ['analysis' => $analysisResult],
                 'status' => 'completed'
             ]);
             
-            \Log::info("Gemini Analysis Success for: " . $this->competitor->name);
+            \Log::info("OpenAI Analysis Success for: " . $this->competitor->name);
 
         } catch (\Exception $e) {
-            \Log::error("Gemini Error: " . $e->getMessage());
+            \Log::error("OpenAI Error: " . $e->getMessage());
             $this->competitor->update(['status' => 'failed']);
         }
     }
