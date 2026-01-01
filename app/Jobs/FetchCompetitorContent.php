@@ -19,38 +19,45 @@ class FetchCompetitorContent implements ShouldQueue
 
     public function handle(): void
     {
-        // 1. Status update to 'fetching'
         $this->competitor->update(['status' => 'fetching']);
 
         try {
-            // 2. Fetch with Real Browser Headers
+            // High-level Browser Headers
             $response = Http::withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36',
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
                 'Accept' => 'text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8',
                 'Accept-Language' => 'en-US,en;q=0.5',
-            ])->timeout(30)->get($this->competitor->website_url);
+                'Referer' => 'https://www.google.com/',
+            ])
+            ->withOptions(['allow_redirects' => true, 'verify' => false]) 
+            ->timeout(30)
+            ->get($this->competitor->website_url);
 
             if ($response->successful()) {
-                // 3. Clean Content: Remove Scripts, Styles, and HTML tags
                 $html = $response->body();
+                
+                // Script aur Style tags ko nikalna zaroori hai
                 $cleanText = preg_replace('/<(script|style)\b[^>]*>(.*?)<\/\1>/is', '', $html);
                 $cleanText = strip_tags($cleanText);
-                $cleanText = preg_replace('/\s+/', ' ', $cleanText); // Extra spaces khatam karne ke liye
+                // Extra lines aur spaces khatam karna
+                $cleanText = preg_replace('/\s+/', ' ', $cleanText);
+
+                if (strlen(trim($cleanText)) < 100) {
+                    \Log::error("Content too short for: " . $this->competitor->website_url);
+                    $this->competitor->update(['status' => 'failed']);
+                    return;
+                }
 
                 $this->competitor->update([
                     'raw_content' => trim($cleanText),
-                    'status' => 'completed'
+                    'status' => 'fetching_completed'
                 ]);
-
-                // 4. Trigger AI Phase (Jab hum Phase 4 shuru karenge tab ye line use hogi)
-                // AnalyzeCompetitorAI::dispatch($this->competitor);
-
             } else {
-                Log::error("Fetching failed for {$this->competitor->website_url}: Status " . $response->status());
+                \Log::error("Fetch Failed. Status: " . $response->status());
                 $this->competitor->update(['status' => 'failed']);
             }
         } catch (\Exception $e) {
-            Log::error("Exception while fetching {$this->competitor->website_url}: " . $e->getMessage());
+            \Log::error("Fetch Exception: " . $e->getMessage());
             $this->competitor->update(['status' => 'failed']);
         }
     }
