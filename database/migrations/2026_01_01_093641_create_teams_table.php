@@ -13,8 +13,8 @@ return new class extends Migration
     public function up(): void
     {
         Schema::create('teams', function (Blueprint $table) {
-            $table->uuid('id')->primary();
-            $table->foreignId('user_id')->index();
+            $table->uuid('id')->primary(); // Check this
+            $table->foreignUuid('user_id')->index(); // Check this
             $table->string('name');
             $table->boolean('personal_team');
             $table->timestamps();
