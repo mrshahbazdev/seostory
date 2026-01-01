@@ -73,7 +73,9 @@
                         <div class="w-8 h-8 rounded-full border-2 border-white bg-slate-200 flex items-center justify-center text-[10px] font-bold">AI</div>
                         <div class="w-8 h-8 rounded-full border-2 border-white bg-slate-100 flex items-center justify-center text-[10px] font-bold text-slate-400">?</div>
                     </div>
-                    <a href="#" class="text-xs font-bold text-slate-900 group-hover:underline">Project Details →</a>
+                    <a href="{{ route('projects.show', $project->id) }}" wire:navigate class="text-sm font-bold text-gray-700 hover:text-indigo-600 transition">
+                        View Details →
+                    </a>
                 </div>
             </div>
         @empty
