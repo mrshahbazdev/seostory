@@ -23,21 +23,24 @@ class AnalyzeCompetitorAI implements ShouldQueue
         try {
             $client = Gemini::client(env('GEMINI_API_KEY'));
             
-            // Sirf kaam ka text bhej rahe hain
-            $content = substr($this->competitor->raw_content, 0, 8000);
+            $content = substr($this->competitor->raw_content, 0, 10000);
 
-            $prompt = "Analyze this website content and give me: 
-                       1. Main Value Proposition 
-                       2. Target Audience 
-                       3. Marketing Strengths.
-                       Text: " . $content;
+            $prompt = "Analyze this website content and provide: 
+                    1. Core Value Proposition 
+                    2. Main Services 
+                    3. Marketing Strategy. 
+                    Content: " . $content;
 
-            $result = $client->geminiPro()->generateContent($prompt);
+            // YAHAN CHANGE HAI: geminiPro() ki jagah gemini15Flash() use karein
+            $result = $client->gemini15Flash()->generateContent($prompt);
 
             $this->competitor->update([
                 'metadata' => ['analysis' => $result->text()],
                 'status' => 'completed'
             ]);
+            
+            \Log::info("Gemini Analysis Success for: " . $this->competitor->name);
+
         } catch (\Exception $e) {
             \Log::error("Gemini Error: " . $e->getMessage());
             $this->competitor->update(['status' => 'failed']);
