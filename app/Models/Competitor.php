@@ -15,4 +15,11 @@ class Competitor extends Model
     {
         return $this->belongsTo(Project::class);
     }
+    public function getHealthScore()
+    {
+        if ($this->status !== 'completed') return 0;
+        
+        // Fill the bar based on analysis presence
+        return !empty($this->metadata['analysis']) ? 85 : 10;
+    }
 }
