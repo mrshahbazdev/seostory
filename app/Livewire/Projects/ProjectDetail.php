@@ -29,11 +29,23 @@ class ProjectDetail extends Component
             'status' => 'pending'
         ]);
 
-        // Background Job ko queue mein dalna
-        FetchCompetitorContent::dispatch($competitor);
+        // Queue ko bypass karke DIRECT fetch aur analyze karein
+        try {
+            // 1. Fetching Start
+            $fetchJob = new \App\Jobs\FetchCompetitorContent($competitor);
+            $fetchJob->handle();
+
+            // 2. AI Analysis Start (Refresh model to get fetched content)
+            $competitor->refresh();
+            if ($competitor->raw_content) {
+                $aiJob = new \App\Jobs\AnalyzeCompetitorAI($competitor);
+                $aiJob->handle();
+            }
+        } catch (\Exception $e) {
+            \Log::error("Direct Run Error: " . $e->getMessage());
+        }
 
         $this->reset(['comp_name', 'comp_url']);
-        session()->flash('message', 'Competitor added and analysis started!');
     }
 
     public function render()
