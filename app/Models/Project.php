@@ -4,6 +4,8 @@ namespace App\Models;
 
 use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
+use App\Models\Team;
+use App\Models\Competitor;
 
 class Project extends Model
 {
@@ -14,5 +16,9 @@ class Project extends Model
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+    public function competitors()
+    {
+        return $this->hasMany(Competitor::class);
     }
 }
