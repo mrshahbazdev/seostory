@@ -5,7 +5,7 @@ namespace App\Livewire\Projects;
 use Livewire\Component;
 use App\Models\Project;
 use App\Models\Competitor;
-
+use App\Jobs\FetchCompetitorContent;
 class ProjectDetail extends Component
 {
     public Project $project;
@@ -23,13 +23,17 @@ class ProjectDetail extends Component
             'comp_url' => 'required|url',
         ]);
 
-        $this->project->competitors()->create([
+        $competitor = $this->project->competitors()->create([
             'name' => $this->comp_name,
             'website_url' => $this->comp_url,
+            'status' => 'pending'
         ]);
 
+        // Background Job ko queue mein dalna
+        FetchCompetitorContent::dispatch($competitor);
+
         $this->reset(['comp_name', 'comp_url']);
-        session()->flash('message', 'Competitor added to project!');
+        session()->flash('message', 'Competitor added and analysis started!');
     }
 
     public function render()
