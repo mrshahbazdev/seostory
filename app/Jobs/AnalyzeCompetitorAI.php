@@ -31,8 +31,10 @@ class AnalyzeCompetitorAI implements ShouldQueue
                     3. Marketing Strategy
                     Website Content: " . $content;
 
-            // UPDATED: geminiPro() ki jagah hum seedha 1.5 Flash call karenge
-            $result = $client->gemini1.5Flash()->generateContent($prompt);
+            // CORRECT SYNTAX: gemini() method use karein aur model name string mein dein
+            $result = $client->gemini15Flash()->generateContent($prompt);
+            // Agar upar wali line phir bhi error de (package version issue), toh ye use karein:
+            // $result = $client->geminiPro()->generateContent($prompt);
 
             $this->competitor->update([
                 'metadata' => ['analysis' => $result->text()],
@@ -43,22 +45,7 @@ class AnalyzeCompetitorAI implements ShouldQueue
 
         } catch (\Exception $e) {
             \Log::error("Gemini Error: " . $e->getMessage());
-            
-            // Fallback: Agar upar wala fail ho, toh ye wala try karein (Different SDK versions ke liye)
-            try {
-                $result = $client->models()->generateContent([
-                    'model' => 'gemini-1.5-flash',
-                    'contents' => [['parts' => [['text' => $prompt]]]]
-                ]);
-                
-                $this->competitor->update([
-                    'metadata' => ['analysis' => $result->text()],
-                    'status' => 'completed'
-                ]);
-            } catch (\Exception $e2) {
-                \Log::error("Gemini Fallback Error: " . $e2->getMessage());
-                $this->competitor->update(['status' => 'failed']);
-            }
+            $this->competitor->update(['status' => 'failed']);
         }
     }
 }
