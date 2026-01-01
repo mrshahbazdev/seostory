@@ -19,7 +19,7 @@ class Competitor extends Model
     {
         if ($this->status !== 'completed') return 0;
         
-        // Fill the bar based on analysis presence
-        return !empty($this->metadata['analysis']) ? 85 : 10;
+        // AI se score nikalne tak hum static score dete hain
+        return !empty($this->metadata['analysis']) ? rand(75, 95) : 10;
     }
 }

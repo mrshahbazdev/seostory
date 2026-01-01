@@ -23,29 +23,42 @@ class AnalyzeCompetitorAI implements ShouldQueue
         try {
             $client = Gemini::client(env('GEMINI_API_KEY'));
             
-            // Saaf content uthana
             $content = substr($this->competitor->raw_content, 0, 10000);
 
             $prompt = "Analyze this competitor's website content and provide: 
-                       1. Value Proposition 
-                       2. Key Products/Services
-                       3. Marketing Strategy
-                       Website Content: " . $content;
+                    1. Value Proposition 
+                    2. Key Products/Services
+                    3. Marketing Strategy
+                    Website Content: " . $content;
 
-            // Universally compatible method:
-            $result = $client->geminiPro()->generateContent($prompt);
+            // UPDATED: geminiPro() ki jagah hum seedha 1.5 Flash call karenge
+            $result = $client->gemini1.5Flash()->generateContent($prompt);
 
             $this->competitor->update([
                 'metadata' => ['analysis' => $result->text()],
                 'status' => 'completed'
             ]);
             
-            \Log::info("AI Analysis Success for: " . $this->competitor->name);
+            \Log::info("Gemini Analysis Success for: " . $this->competitor->name);
 
         } catch (\Exception $e) {
             \Log::error("Gemini Error: " . $e->getMessage());
-            // Agar API version ka masla ho toh ye fallback try karein
-            $this->competitor->update(['status' => 'failed']);
+            
+            // Fallback: Agar upar wala fail ho, toh ye wala try karein (Different SDK versions ke liye)
+            try {
+                $result = $client->models()->generateContent([
+                    'model' => 'gemini-1.5-flash',
+                    'contents' => [['parts' => [['text' => $prompt]]]]
+                ]);
+                
+                $this->competitor->update([
+                    'metadata' => ['analysis' => $result->text()],
+                    'status' => 'completed'
+                ]);
+            } catch (\Exception $e2) {
+                \Log::error("Gemini Fallback Error: " . $e2->getMessage());
+                $this->competitor->update(['status' => 'failed']);
+            }
         }
     }
 }
