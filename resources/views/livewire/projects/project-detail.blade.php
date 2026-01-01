@@ -1,5 +1,4 @@
-<div class="max-w-[1600px] mx-auto">
-    <nav class="flex mb-8 text-sm font-medium text-slate-400 space-x-2">
+<div wire:poll.5s class="max-w-[1600px] mx-auto">    <nav class="flex mb-8 text-sm font-medium text-slate-400 space-x-2">
         <a href="/dashboard" class="hover:text-indigo-600 transition">Dashboard</a>
         <span>/</span>
         <span class="text-slate-900">Project: {{ $project->name }}</span>
@@ -53,7 +52,26 @@
                     <thead class="bg-slate-50/50 border-b border-slate-100">
                         <tr>
                             <th class="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Competitor</th>
-                            <th class="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Status</th>
+                            <td class="px-8 py-6">
+                                @if($competitor->status == 'pending')
+                                    <span class="inline-flex items-center px-3 py-1 bg-slate-100 text-slate-500 text-[10px] font-bold uppercase rounded-full tracking-widest border border-slate-200">
+                                        In Queue
+                                    </span>
+                                @elseif($competitor->status == 'fetching' || $competitor->status == 'analyzing')
+                                    <span class="inline-flex items-center px-3 py-1 bg-indigo-50 text-indigo-600 text-[10px] font-bold uppercase rounded-full tracking-widest border border-indigo-100 animate-pulse">
+                                        <svg class="animate-spin -ml-1 mr-2 h-3 w-3 text-indigo-600" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+                                        {{ ucfirst($competitor->status) }}...
+                                    </span>
+                                @elseif($competitor->status == 'completed')
+                                    <span class="inline-flex items-center px-3 py-1 bg-green-50 text-green-700 text-[10px] font-bold uppercase rounded-full tracking-widest border border-green-100">
+                                        Ready
+                                    </span>
+                                @else
+                                    <span class="inline-flex items-center px-3 py-1 bg-rose-50 text-rose-700 text-[10px] font-bold uppercase rounded-full tracking-widest border border-rose-100">
+                                        Failed
+                                    </span>
+                                @endif
+                            </td>
                             <th class="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest">Health Score</th>
                             <th class="px-8 py-5 text-[11px] font-bold text-slate-400 uppercase tracking-widest text-right">Action</th>
                         </tr>
