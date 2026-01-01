@@ -54,11 +54,16 @@ class FetchCompetitorContent implements ShouldQueue
             $cleanText = trim($cleanText);
 
             if (strlen($cleanText) > 100) {
-                $this->competitor->update([
-                    'raw_content' => substr($cleanText, 0, 15000), 
-                    'status' => 'fetching_completed'
-                ]);
-                Log::info("Success: Data fetched for " . $url);
+                // Direct DB update taake model instance ka masla na rahe
+                \Illuminate\Support\Facades\DB::table('competitors')
+                    ->where('id', $this->competitor->id)
+                    ->update([
+                        'raw_content' => substr($cleanText, 0, 15000),
+                        'status' => 'fetching_completed',
+                        'updated_at' => now()
+                    ]);
+
+                Log::info("DATABASE UPDATED FOR: " . $url);
             } else {
                 Log::warning("Cleaning Error: Content too short for " . $url);
                 $this->competitor->update(['status' => 'failed']);
