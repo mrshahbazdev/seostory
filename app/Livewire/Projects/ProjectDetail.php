@@ -28,7 +28,6 @@ class ProjectDetail extends Component
             'comp_url' => 'required|url',
         ]);
 
-        // 1. Create record
         $competitor = $this->project->competitors()->create([
             'name' => $this->comp_name,
             'website_url' => $this->comp_url,
@@ -36,19 +35,23 @@ class ProjectDetail extends Component
         ]);
 
         try {
-            // 2. Direct Fetch
+            // 1. Fetching logic run karein
             $fetchJob = new \App\Jobs\FetchCompetitorContent($competitor);
             $fetchJob->handle();
             
-            // 3. Re-fetch from DB to see if content was saved
+            // 2. Refresh from Database
             $competitor->refresh();
 
-            if (!empty($competitor->raw_content)) {
-                // 4. Direct AI Analysis
+            // 3. Status check karein (kyunki aapka job 'fetching_completed' set karta hai)
+            if ($competitor->status === 'fetching_completed' || !empty($competitor->raw_content)) {
+                Log::info("Content saved successfully. Triggering Gemini AI...");
+                
                 $aiJob = new \App\Jobs\AnalyzeCompetitorAI($competitor);
                 $aiJob->handle();
+                
+                Log::info("AI Analysis completed for: " . $competitor->name);
             } else {
-                Log::warning("Fetch job finished but raw_content is empty for: " . $competitor->website_url);
+                Log::warning("Fetch finished but status is: " . $competitor->status);
             }
 
         } catch (\Exception $e) {
