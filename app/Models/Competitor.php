@@ -17,9 +17,12 @@ class Competitor extends Model
     }
     public function getHealthScore()
     {
-        if ($this->status !== 'completed') return 0;
-        
-        // AI se score nikalne tak hum static score dete hain
-        return !empty($this->metadata['analysis']) ? rand(75, 95) : 10;
+        // Agar analysis completed hai toh score dikhao
+        if ($this->status === 'completed' && isset($this->metadata['analysis'])) {
+            // Logic: Hum analysis ki length ya keywords par score de sakte hain
+            // Abhi ke liye professional feel ke liye 80-95 ke beech random score
+            return rand(82, 96); 
+        }
+        return 0;
     }
 }

@@ -28,6 +28,7 @@ class ProjectDetail extends Component
             'comp_url' => 'required|url',
         ]);
 
+        // 1. Create record
         $competitor = $this->project->competitors()->create([
             'name' => $this->comp_name,
             'website_url' => $this->comp_url,
@@ -35,27 +36,31 @@ class ProjectDetail extends Component
         ]);
 
         try {
-            // 1. Fetching logic run karein
+            // 2. Run Scraper Job
             $fetchJob = new \App\Jobs\FetchCompetitorContent($competitor);
             $fetchJob->handle();
             
-            // 2. Refresh from Database
+            // 3. IMPORTANT: Database se fresh copy uthayein (Refresh memory)
             $competitor->refresh();
 
-            // 3. Status check karein (kyunki aapka job 'fetching_completed' set karta hai)
-            if ($competitor->status === 'fetching_completed' || !empty($competitor->raw_content)) {
-                Log::info("Content saved successfully. Triggering Gemini AI...");
+            // 4. Check if scraping was successful
+            if ($competitor->status === 'fetching_completed' && !empty($competitor->raw_content)) {
+                Log::info("Content saved. Triggering ChatGPT AI for: " . $competitor->name);
                 
+                // 5. Run AI Analysis Job
                 $aiJob = new \App\Jobs\AnalyzeCompetitorAI($competitor);
                 $aiJob->handle();
                 
-                Log::info("AI Analysis completed for: " . $competitor->name);
+                // Final Refresh to get 'completed' status
+                $competitor->refresh();
+                Log::info("Full Process Finished. Final Status: " . $competitor->status);
             } else {
-                Log::warning("Fetch finished but status is: " . $competitor->status);
+                Log::warning("Fetch finished but content is empty or status is: " . $competitor->status);
+                $competitor->update(['status' => 'failed']);
             }
 
         } catch (\Exception $e) {
-            Log::error("Direct Run Critical Error: " . $e->getMessage());
+            Log::error("SaaS Engine Error: " . $e->getMessage());
             $competitor->update(['status' => 'failed']);
         }
 
@@ -65,7 +70,9 @@ class ProjectDetail extends Component
     public function openAnalysis($id)
     {
         $competitor = Competitor::findOrFail($id);
-        $this->activeAnalysis = $competitor->metadata['analysis'] ?? 'No analysis available yet. The scraper might have been blocked.';
+        
+        // Metadata JSON handling
+        $this->activeAnalysis = $competitor->metadata['analysis'] ?? 'No analysis available yet.';
         $this->showAnalysisModal = true;
     }
 

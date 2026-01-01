@@ -99,7 +99,9 @@
                                         <div class="w-20 bg-slate-100 h-1.5 rounded-full overflow-hidden">
                                             <div class="bg-indigo-500 h-full w-[10%]"></div>
                                         </div>
-                                        <span class="text-[10px] text-slate-400 mt-1 font-bold italic">Score: 0</span>
+                                        <span class="px-3 py-1 rounded-full text-xs font-bold {{ $competitor->status == 'completed' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-red-500/10 text-red-500' }}">
+                                            {{ ucfirst($competitor->status == 'completed' ? 'Ready' : $competitor->status) }}
+                                        </span>
                                     </div>
                                 </td>
 
