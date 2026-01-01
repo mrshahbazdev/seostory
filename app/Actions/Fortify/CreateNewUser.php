@@ -44,10 +44,19 @@ class CreateNewUser implements CreatesNewUsers
      */
     protected function createTeam(User $user): void
     {
-        $user->ownedTeams()->save(Team::forceCreate([
+        // Pehle team create karein
+        $team = Team::forceCreate([
             'user_id' => $user->id,
-            'name' => explode(' ', $user->name, 2)[0]."'s Team",
+            'name' => explode(' ', $user->name, 2)[0]."'s Workspace",
             'personal_team' => true,
-        ]));
+        ]);
+
+        // Ab user ko force karein ke wo is team ko apna current_team_id banaye
+        $user->forceFill([
+            'current_team_id' => $team->id,
+        ])->save();
+        
+        // User ko team ka member bhi banayein (Pivot table)
+        $user->teams()->attach($team, ['role' => 'admin']);
     }
 }
