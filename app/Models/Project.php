@@ -6,7 +6,7 @@ use App\Traits\HasUuid;
 use Illuminate\Database\Eloquent\Model;
 use App\Models\Team;
 use App\Models\Competitor;
-
+use App\Models\User;
 class Project extends Model
 {
     use HasUuid;
@@ -16,6 +16,10 @@ class Project extends Model
     public function team()
     {
         return $this->belongsTo(Team::class);
+    }
+    public function user()
+    {
+        return $this->belongsTo(User::class);
     }
     public function competitors()
     {

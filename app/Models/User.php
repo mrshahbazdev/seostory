@@ -11,6 +11,7 @@ use Laravel\Jetstream\HasProfilePhoto;
 use Laravel\Jetstream\HasTeams;
 use Laravel\Sanctum\HasApiTokens;
 use App\Traits\HasUuid;
+use App\Models\Project;
 class User extends Authenticatable
 {
     use HasApiTokens;
@@ -44,7 +45,13 @@ class User extends Authenticatable
         'two_factor_recovery_codes',
         'two_factor_secret',
     ];
-
+    /**
+     * Get all of the projects for the user.
+     */
+    public function projects()
+    {
+        return $this->hasMany(Project::class);
+    }
     /**
      * The accessors to append to the model's array form.
      *
