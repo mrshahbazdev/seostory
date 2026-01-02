@@ -13,9 +13,8 @@ return new class extends Migration
     {
         Schema::create('competitor_pages', function (Blueprint $table) {
             $table->id();
-            
+            // foreignId ki jagah foreignUuid use karein
             $table->foreignUuid('competitor_id')->constrained()->onDelete('cascade');
-            
             $table->string('url');
             $table->longText('raw_content')->nullable();
             $table->json('metadata')->nullable();
