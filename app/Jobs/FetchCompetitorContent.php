@@ -8,7 +8,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
-use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class FetchCompetitorContent implements ShouldQueue
 {
@@ -18,59 +18,88 @@ class FetchCompetitorContent implements ShouldQueue
 
     public function handle(): void
     {
-        $this->competitor->update(['status' => 'fetching']);
-        $url = $this->competitor->website_url;
+        try {
+            $response = Http::withHeaders([
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+            ])->timeout(30)->get($this->competitor->website_url);
 
-        $ch = curl_init();
-        curl_setopt($ch, CURLOPT_URL, $url);
-        curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
-        curl_setopt($ch, CURLOPT_FOLLOWLOCATION, true);
-        curl_setopt($ch, CURLOPT_MAXREDIRS, 5);
-        // Nike jaisi sites ke liye headers bohat zaroori hain
-        curl_setopt($ch, CURLOPT_HTTPHEADER, [
-            'Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language: en-US,en;q=0.5',
-            'Upgrade-Insecure-Requests: 1',
-            'Cache-Control: max-age=0',
-        ]);
-        curl_setopt($ch, CURLOPT_USERAGENT, 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36');
-        curl_setopt($ch, CURLOPT_TIMEOUT, 30);
-        curl_setopt($ch, CURLOPT_SSL_VERIFYPEER, false); 
-        curl_setopt($ch, CURLOPT_ENCODING, ""); 
+            if ($response->successful()) {
+                $html = $response->body();
+                $dom = new \DOMDocument();
+                @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+                $xpath = new \DOMXPath($dom);
 
-        $html = curl_exec($ch);
-        $httpCode = curl_getinfo($ch, CURLINFO_HTTP_CODE);
-        $error = curl_error($ch);
-        curl_close($ch);
+                // 1. Text Stats
+                $plainText = strip_tags($html);
+                $wordCount = str_word_count($plainText);
+                $charCount = strlen($plainText);
 
-        if ($html && $httpCode == 200) {
-            // SAFE CLEANING: Sirf Script aur Style hatayen, baki rehne den
-            $html = preg_replace('/<script\b[^>]*>(.*?)<\/script>/is', '', $html);
-            $html = preg_replace('/<style\b[^>]*>(.*?)<\/style>/is', '', $html);
-            
-            $cleanText = strip_tags($html);
-            $cleanText = html_entity_decode($cleanText);
-            $cleanText = preg_replace('/\s+/', ' ', $cleanText);
-            $cleanText = trim($cleanText);
+                // 2. Meta Data
+                $title = $dom->getElementsByTagName('title')->item(0)?->nodeValue ?? 'No Title';
+                $description = "";
+                foreach ($dom->getElementsByTagName('meta') as $meta) {
+                    if ($meta->getAttribute('name') === 'description') {
+                        $description = $meta->getAttribute('content');
+                    }
+                }
 
-            if (strlen($cleanText) > 100) {
-                // Direct DB update taake model instance ka masla na rahe
-                \Illuminate\Support\Facades\DB::table('competitors')
-                    ->where('id', $this->competitor->id)
-                    ->update([
-                        'raw_content' => substr($cleanText, 0, 15000),
-                        'status' => 'fetching_completed',
-                        'updated_at' => now()
-                    ]);
+                // 3. Tags Extraction
+                $h1 = $dom->getElementsByTagName('h1');
+                $h2 = $dom->getElementsByTagName('h2');
+                $h3 = $dom->getElementsByTagName('h3');
+                $strong = $dom->getElementsByTagName('strong');
+                $b = $dom->getElementsByTagName('b');
+                
+                // 4. Images & Alt Tags
+                $images = $dom->getElementsByTagName('img');
+                $missingAlt = 0;
+                foreach ($images as $img) {
+                    if (!$img->getAttribute('alt')) $missingAlt++;
+                }
 
-                Log::info("DATABASE UPDATED FOR: " . $url);
-            } else {
-                Log::warning("Cleaning Error: Content too short for " . $url);
-                $this->competitor->update(['status' => 'failed']);
+                // 5. Links Audit
+                $links = $dom->getElementsByTagName('a');
+                $brokenLinks = 0; // Baseline check, deep check requires separate requests
+
+                // Structure Data for Database
+                $seoData = [
+                    'title' => $title,
+                    'description' => $description,
+                    'stats' => [
+                        'words' => $wordCount,
+                        'chars' => $charCount,
+                    ],
+                    'tags' => [
+                        'h1_count' => $h1->length,
+                        'h1_list' => $this->getTagsContent($h1),
+                        'h2_count' => $h2->length,
+                        'h3_count' => $h3->length,
+                        'bold_count' => ($strong->length + $b->length),
+                    ],
+                    'images' => [
+                        'total' => $images->length,
+                        'missing_alt' => $missingAlt,
+                    ],
+                    'links_count' => $links->length,
+                ];
+
+                $this->competitor->update([
+                    'raw_content' => substr($plainText, 0, 10000),
+                    'metadata' => [
+                        'seo_report' => $seoData
+                    ],
+                    'status' => 'fetching_completed'
+                ]);
             }
-        } else {
-            Log::error("Fetch Failed for $url. Code: $httpCode. Error: $error");
+        } catch (\Exception $e) {
+            \Log::error("Scraping Error: " . $e->getMessage());
             $this->competitor->update(['status' => 'failed']);
         }
+    }
+
+    private function getTagsContent($tags) {
+        $content = [];
+        foreach ($tags as $tag) { $content[] = trim($tag->nodeValue); }
+        return array_slice($content, 0, 5); // Sirf pehle 5 H1s (agar hon)
     }
 }
