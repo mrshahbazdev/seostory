@@ -5,6 +5,7 @@ namespace App\Livewire\Projects;
 use Livewire\Component;
 use App\Models\Project;
 use App\Models\Competitor;
+use App\Models\CompetitorPage; // Naya Model
 use Illuminate\Support\Facades\Log;
 
 class ProjectDetail extends Component
@@ -12,6 +13,10 @@ class ProjectDetail extends Component
     public Project $project;
     public $comp_name, $comp_url;
     
+    // Sub-page scanning properties
+    public $sub_page_url; 
+    public $selectedCompetitorId = null; 
+
     public $showAnalysisModal = false;
     public $activeAnalysis = '';
 
@@ -20,6 +25,9 @@ class ProjectDetail extends Component
         $this->project = $project;
     }
 
+    /**
+     * Phase 3: Add Main Competitor (Main Domain)
+     */
     public function addCompetitor()
     {
         $this->validate([
@@ -34,11 +42,11 @@ class ProjectDetail extends Component
         ]);
 
         try {
-            // Step 1: Sirf Scraper chalayein (Technical Audit)
-            $fetchJob = new \App\Jobs\FetchCompetitorContent($competitor);
+            // Hum job ko bhej rahe hain (False ka matlab hai ye main domain hai)
+            $fetchJob = new \App\Jobs\FetchCompetitorContent($competitor, false);
             $fetchJob->handle();
             
-            Log::info("Technical Scraping completed for: " . $competitor->name);
+            Log::info("Technical Scraping completed for main domain: " . $competitor->name);
         } catch (\Exception $e) {
             Log::error("Scraping Error: " . $e->getMessage());
             $competitor->update(['status' => 'failed']);
@@ -47,20 +55,49 @@ class ProjectDetail extends Component
         $this->reset(['comp_name', 'comp_url']);
     }
 
-    // YEH HAI WOH MISSING FUNCTION:
+    /**
+     * NEW: Scan Specific Sub-Page of a Competitor
+     */
+    public function scanSubPage($competitorId)
+    {
+        $this->validate([
+            'sub_page_url' => 'required|url',
+        ]);
+
+        $competitor = Competitor::findOrFail($competitorId);
+
+        // Sub-page record create karein
+        $page = CompetitorPage::create([
+            'competitor_id' => $competitorId,
+            'url' => $this->sub_page_url,
+            'status' => 'pending'
+        ]);
+
+        try {
+            // True ka matlab hai ye sub-page crawl ho raha hai
+            $fetchJob = new \App\Jobs\FetchCompetitorContent($page, true);
+            $fetchJob->handle();
+            
+            $this->reset('sub_page_url');
+            Log::info("Sub-page audit finished for: " . $page->url);
+        } catch (\Exception $e) {
+            Log::error("Sub-page Scan Error: " . $e->getMessage());
+            $page->update(['status' => 'failed']);
+        }
+    }
+
+    /**
+     * Phase 4: Run AI Analysis manually
+     */
     public function runAI($id)
     {
         $competitor = Competitor::findOrFail($id);
-        
-        // Status update taake UI par animation dikhe
         $competitor->update(['status' => 'analyzing']);
 
         try {
-            // Step 2: Manually trigger ChatGPT Analysis
             $aiJob = new \App\Jobs\AnalyzeCompetitorAI($competitor);
             $aiJob->handle();
-            
-            Log::info("AI Analysis manually triggered and finished for: " . $competitor->name);
+            Log::info("AI Analysis finished for: " . $competitor->name);
         } catch (\Exception $e) {
             Log::error("AI Manual Run Error: " . $e->getMessage());
             $competitor->update(['status' => 'failed']);
@@ -77,7 +114,8 @@ class ProjectDetail extends Component
     public function render()
     {
         return view('livewire.projects.project-detail', [
-            'competitors' => $this->project->competitors()->latest()->get()
+            // Eager loading pages taake query fast ho
+            'competitors' => $this->project->competitors()->with('pages')->latest()->get()
         ])->layout('layouts.app');
     }
 }

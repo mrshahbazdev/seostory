@@ -5,6 +5,8 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Model;
 
 use App\Traits\HasUuid;
+use App\Models\Project;
+use App\Models\CompetitorPage;
 
 class Competitor extends Model
 {
@@ -26,5 +28,8 @@ class Competitor extends Model
             return rand(82, 96); 
         }
         return 0;
+    }
+    public function pages() {
+        return $this->hasMany(CompetitorPage::class);
     }
 }
