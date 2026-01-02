@@ -35,7 +35,9 @@ class ProjectManager extends Component
     public function render()
     {
         return view('livewire.projects.project-manager', [
-            'projects' => Auth::user()->projects()->latest()->get()
+            'projects' => Project::where('team_id', Auth::user()->current_team_id)
+                                ->latest()
+                                ->get()
         ]);
     }
 }

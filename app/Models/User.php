@@ -50,7 +50,8 @@ class User extends Authenticatable
      */
     public function projects()
     {
-        return $this->hasMany(Project::class);
+        // Ye line user ki current team ke saare projects nikal kar degi
+        return $this->hasMany(Project::class, 'team_id', 'current_team_id');
     }
     /**
      * The accessors to append to the model's array form.
