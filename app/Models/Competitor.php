@@ -10,7 +10,9 @@ class Competitor extends Model
 {
     use HasUuid;
     protected $fillable = ['project_id', 'name', 'website_url', 'metadata'];
-
+    protected $casts = [
+        'metadata' => 'array', // Ye line lazmi honi chahiye
+    ];
     public function project()
     {
         return $this->belongsTo(Project::class);
