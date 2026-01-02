@@ -12,7 +12,6 @@ class ProjectDetail extends Component
     public Project $project;
     public $comp_name, $comp_url;
     
-    // Phase 4 Properties
     public $showAnalysisModal = false;
     public $activeAnalysis = '';
 
@@ -28,7 +27,6 @@ class ProjectDetail extends Component
             'comp_url' => 'required|url',
         ]);
 
-        // 1. Create record
         $competitor = $this->project->competitors()->create([
             'name' => $this->comp_name,
             'website_url' => $this->comp_url,
@@ -36,42 +34,42 @@ class ProjectDetail extends Component
         ]);
 
         try {
-            // 2. Run Scraper Job
+            // Step 1: Sirf Scraper chalayein (Technical Audit)
             $fetchJob = new \App\Jobs\FetchCompetitorContent($competitor);
             $fetchJob->handle();
             
-            // 3. IMPORTANT: Database se fresh copy uthayein (Refresh memory)
-            $competitor->refresh();
-
-            // 4. Check if scraping was successful
-            if ($competitor->status === 'fetching_completed' && !empty($competitor->raw_content)) {
-                Log::info("Content saved. Triggering ChatGPT AI for: " . $competitor->name);
-                
-                // 5. Run AI Analysis Job
-                $aiJob = new \App\Jobs\AnalyzeCompetitorAI($competitor);
-                $aiJob->handle();
-                
-                // Final Refresh to get 'completed' status
-                $competitor->refresh();
-                Log::info("Full Process Finished. Final Status: " . $competitor->status);
-            } else {
-                Log::warning("Fetch finished but content is empty or status is: " . $competitor->status);
-                $competitor->update(['status' => 'failed']);
-            }
-
+            Log::info("Technical Scraping completed for: " . $competitor->name);
         } catch (\Exception $e) {
-            Log::error("SaaS Engine Error: " . $e->getMessage());
+            Log::error("Scraping Error: " . $e->getMessage());
             $competitor->update(['status' => 'failed']);
         }
 
         $this->reset(['comp_name', 'comp_url']);
     }
 
-    public function openAnalysis($id)
+    // YEH HAI WOH MISSING FUNCTION:
+    public function runAI($id)
     {
         $competitor = Competitor::findOrFail($id);
         
-        // Metadata JSON handling
+        // Status update taake UI par animation dikhe
+        $competitor->update(['status' => 'analyzing']);
+
+        try {
+            // Step 2: Manually trigger ChatGPT Analysis
+            $aiJob = new \App\Jobs\AnalyzeCompetitorAI($competitor);
+            $aiJob->handle();
+            
+            Log::info("AI Analysis manually triggered and finished for: " . $competitor->name);
+        } catch (\Exception $e) {
+            Log::error("AI Manual Run Error: " . $e->getMessage());
+            $competitor->update(['status' => 'failed']);
+        }
+    }
+
+    public function openAnalysis($id)
+    {
+        $competitor = Competitor::findOrFail($id);
         $this->activeAnalysis = $competitor->metadata['analysis'] ?? 'No analysis available yet.';
         $this->showAnalysisModal = true;
     }
