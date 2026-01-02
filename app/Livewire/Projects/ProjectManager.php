@@ -8,32 +8,34 @@ use Illuminate\Support\Facades\Auth;
 
 class ProjectManager extends Component
 {
-    public $name;
-    public $url;
-
-    protected $rules = [
-        'name' => 'required|min:3|max:50',
-        'url' => 'nullable|url',
-    ];
+    public $name, $url;
+    
+    // MISSING PROPERTY ADD KAREIN:
+    public $showCreateForm = false; 
 
     public function createProject()
     {
-        $this->validate();
-
-        // Har project current team (workspace) se link hoga
-        Auth::user()->currentTeam->projects()->create([
-            'name' => $this->name,
-            'url' => $this->url,
+        $this->validate([
+            'name' => 'required|min:3',
+            'url' => 'required|url',
         ]);
 
-        $this->reset(['name', 'url']);
-        session()->flash('message', 'Project successfully created!');
+        Project::create([
+            'name' => $this->name,
+            'url' => $this->url,
+            'user_id' => Auth::id(),
+        ]);
+
+        $this->reset(['name', 'url', 'showCreateForm']);
+        
+        // Success message (Optional)
+        session()->flash('message', 'Project created successfully!');
     }
 
     public function render()
     {
         return view('livewire.projects.project-manager', [
-            'projects' => Auth::user()->currentTeam->projects()->latest()->get()
+            'projects' => Auth::user()->projects()->latest()->get()
         ]);
     }
 }
