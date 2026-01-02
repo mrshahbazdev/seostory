@@ -9,6 +9,7 @@ use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Http;
+use Illuminate\Support\Facades\DB; // Direct DB access ke liye
 
 class FetchCompetitorContent implements ShouldQueue
 {
@@ -20,21 +21,18 @@ class FetchCompetitorContent implements ShouldQueue
     {
         try {
             $response = Http::withHeaders([
-                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36'
+                'User-Agent' => 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36'
             ])->timeout(30)->get($this->competitor->website_url);
 
             if ($response->successful()) {
                 $html = $response->body();
                 $dom = new \DOMDocument();
                 @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
-                $xpath = new \DOMXPath($dom);
 
-                // 1. Text Stats
+                // 1. Text & Meta Stats
                 $plainText = strip_tags($html);
                 $wordCount = str_word_count($plainText);
-                $charCount = strlen($plainText);
-
-                // 2. Meta Data
+                
                 $title = $dom->getElementsByTagName('title')->item(0)?->nodeValue ?? 'No Title';
                 $description = "";
                 foreach ($dom->getElementsByTagName('meta') as $meta) {
@@ -43,63 +41,57 @@ class FetchCompetitorContent implements ShouldQueue
                     }
                 }
 
-                // 3. Tags Extraction
+                // 2. Headings & Tags
                 $h1 = $dom->getElementsByTagName('h1');
                 $h2 = $dom->getElementsByTagName('h2');
                 $h3 = $dom->getElementsByTagName('h3');
-                $strong = $dom->getElementsByTagName('strong');
-                $b = $dom->getElementsByTagName('b');
                 
-                // 4. Images & Alt Tags
+                // 3. Images & Alt Audit
                 $images = $dom->getElementsByTagName('img');
                 $missingAlt = 0;
                 foreach ($images as $img) {
                     if (!$img->getAttribute('alt')) $missingAlt++;
                 }
 
-                // 5. Links Audit
-                $links = $dom->getElementsByTagName('a');
-                $brokenLinks = 0; // Baseline check, deep check requires separate requests
-
-                // Structure Data for Database
+                // Metadata Object Taiyar Karein
                 $seoData = [
-                    'title' => $title,
-                    'description' => $description,
-                    'stats' => [
-                        'words' => $wordCount,
-                        'chars' => $charCount,
-                    ],
-                    'tags' => [
-                        'h1_count' => $h1->length,
-                        'h1_list' => $this->getTagsContent($h1),
-                        'h2_count' => $h2->length,
-                        'h3_count' => $h3->length,
-                        'bold_count' => ($strong->length + $b->length),
-                    ],
-                    'images' => [
-                        'total' => $images->length,
-                        'missing_alt' => $missingAlt,
-                    ],
-                    'links_count' => $links->length,
+                    'seo_report' => [
+                        'title' => trim($title),
+                        'description' => trim($description),
+                        'stats' => [
+                            'words' => $wordCount,
+                            'chars' => strlen($plainText),
+                        ],
+                        'tags' => [
+                            'h1_count' => $h1->length,
+                            'h2_count' => $h2->length,
+                            'h3_count' => $h3->length,
+                        ],
+                        'images' => [
+                            'total' => $images->length,
+                            'missing_alt' => $missingAlt,
+                        ]
+                    ]
                 ];
 
-                $this->competitor->update([
-                    'raw_content' => substr($plainText, 0, 10000),
-                    'metadata' => [
-                        'seo_report' => $seoData
-                    ],
-                    'status' => 'fetching_completed'
-                ]);
+                // 🚀 FORCE UPDATE: Direct SQL bypass model cache
+                DB::table('competitors')
+                    ->where('id', $this->competitor->id)
+                    ->update([
+                        'raw_content' => substr($plainText, 0, 15000),
+                        'metadata' => json_encode($seoData), // Direct JSON string
+                        'status' => 'fetching_completed',
+                        'updated_at' => now()
+                    ]);
+
+                \Log::info("FORCE DB UPDATE SUCCESS for: " . $this->competitor->name);
             }
         } catch (\Exception $e) {
-            \Log::error("Scraping Error: " . $e->getMessage());
-            $this->competitor->update(['status' => 'failed']);
+            \Log::error("Scraping Force Update Error: " . $e->getMessage());
+            
+            DB::table('competitors')
+                ->where('id', $this->competitor->id)
+                ->update(['status' => 'failed', 'updated_at' => now()]);
         }
-    }
-
-    private function getTagsContent($tags) {
-        $content = [];
-        foreach ($tags as $tag) { $content[] = trim($tag->nodeValue); }
-        return array_slice($content, 0, 5); // Sirf pehle 5 H1s (agar hon)
     }
 }
