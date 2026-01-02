@@ -24,11 +24,11 @@ class ProjectManager extends Component
             'name' => $this->name,
             'url' => $this->url,
             'user_id' => Auth::id(),
+            // Agat Jetstream Teams hai toh ye line lazmi hai:
+            'team_id' => Auth::user()->current_team_id, 
         ]);
 
         $this->reset(['name', 'url', 'showCreateForm']);
-        
-        // Success message (Optional)
         session()->flash('message', 'Project created successfully!');
     }
 
