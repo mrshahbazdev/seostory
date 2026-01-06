@@ -189,9 +189,13 @@ class ProjectDetail extends Component
     public function render()
     {
         return view('livewire.projects.project-detail', [
-            'competitors' => $this->project->competitors()->with('pages')->latest()->get(),
-            // Self-audit history fetch kar rahe hain
-            'audits' => $this->project->audits()->where('type', 'self')->latest()->take(10)->get()
+            'competitors' => $this->project->competitors()->latest()->get(),
+            // Latest audits humesha fresh database se uthain
+            'audits' => \App\Models\Audit::where('project_id', $this->project->id)
+                            ->where('type', 'self')
+                            ->latest()
+                            ->take(10)
+                            ->get()
         ])->layout('layouts.app');
     }
 }
