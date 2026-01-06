@@ -30,9 +30,14 @@ class ProjectDetail extends Component
     public $showPageDetailModal = false;
     public $activePageData = null;
     public $showCrawlerModal = false;
+    public $currentView = 'overview';
     public function mount(Project $project)
     {
         $this->project = $project;
+    }
+    public function setView($view)
+    {
+        $this->currentView = $view;
     }
     public function openCrawlerStatus()
     {
