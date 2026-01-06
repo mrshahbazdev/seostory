@@ -13,14 +13,10 @@ class Audit extends Model
 
     // In columns ko mass assignment ke liye allow karein
     protected $fillable = [
-        'project_id',
-        'type',
-        'competitor_id',
-        'overall_health_score',
-        'pages_scanned',
-        'critical_issues',
-        'status',
-        'summary_data'
+        'project_id', 'type', 'competitor_id', 'status',
+        'overall_health_score', 'score_tech', 'score_structure', 'score_content',
+        'pages_scanned', 'critical_issues',
+        'tech_meta_data', 'structure_data', 'content_data', 'summary_data'
     ];
 
     /**

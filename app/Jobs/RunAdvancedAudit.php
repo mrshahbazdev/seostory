@@ -24,6 +24,7 @@ class RunAdvancedAudit implements ShouldQueue
             $url = $this->page->url;
             $startTime = microtime(true);
 
+            // 1. Fetch Page with Pro Headers
             $response = Http::withHeaders([
                 'User-Agent' => 'SEOsStory-SeobilityBot/3.0',
                 'Accept-Encoding' => 'gzip, deflate, br',
@@ -42,7 +43,16 @@ class RunAdvancedAudit implements ShouldQueue
             @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
             $xpath = new \DOMXPath($dom);
 
-            // 1. TECHNOLOGY & META PILLAR
+            // --- 🧪 THE POSTMORTEM ENGINE ---
+
+            // A. Technology & Meta
+            $seo = [
+                'title' => trim($dom->getElementsByTagName('title')->item(0)?->nodeValue ?? ''),
+                'description' => $xpath->query('//meta[@name="description"]/@content')->item(0)?->nodeValue,
+                'canonical' => $xpath->query('//link[@rel="canonical"]/@href')->item(0)?->nodeValue,
+                'robots' => $xpath->query('//meta[@name="robots"]/@content')->item(0)?->nodeValue,
+            ];
+
             $technical = [
                 'status_code' => $response->status(),
                 'server' => $response->header('Server'),
@@ -51,14 +61,7 @@ class RunAdvancedAudit implements ShouldQueue
                 'content_type' => $response->header('Content-Type'),
             ];
 
-            $seo = [
-                'title' => trim($dom->getElementsByTagName('title')->item(0)?->nodeValue ?? ''),
-                'description' => $xpath->query('//meta[@name="description"]/@content')->item(0)?->nodeValue,
-                'canonical' => $xpath->query('//link[@rel="canonical"]/@href')->item(0)?->nodeValue,
-                'robots' => $xpath->query('//meta[@name="robots"]/@content')->item(0)?->nodeValue,
-            ];
-
-            // 2. STRUCTURE PILLAR (Links & Depth)
+            // B. Structure Analysis (Depth & Links)
             $path = parse_url($url, PHP_URL_PATH);
             $depth = ($path == '/' || $path == '') ? 0 : count(explode('/', trim($path, '/')));
             
@@ -71,15 +74,16 @@ class RunAdvancedAudit implements ShouldQueue
                 'external_count' => $externalLinks->length,
                 'h1' => $this->getTagsArray($dom, 'h1'),
                 'h2' => $this->getTagsArray($dom, 'h2'),
+                'has_strong' => $xpath->query('//strong | //b')->length > 0,
             ];
 
-            // 3. CONTENT PILLAR
+            // C. Content Analysis
             $cleanText = strip_tags($html);
             $wordCount = str_word_count($cleanText);
             
-            // Keyword Consistency (Title keywords body mein hain?)
-            $titleWords = explode(' ', strtolower(preg_replace('/[^a-z0-9 ]/i', '', $seo['title'])));
-            $foundKeywords = array_filter($titleWords, fn($word) => strlen($word) > 3 && str_contains(strtolower($cleanText), $word));
+            // Keyword Consistency check
+            $titleWords = array_filter(explode(' ', strtolower(preg_replace('/[^a-z0-9 ]/i', '', $seo['title']))), fn($w) => strlen($w) > 3);
+            $foundKeywords = array_filter($titleWords, fn($word) => str_contains(strtolower($cleanText), $word));
 
             $content = [
                 'word_count' => $wordCount,
@@ -88,25 +92,22 @@ class RunAdvancedAudit implements ShouldQueue
                 'images_missing_alt' => $xpath->query('//img[not(@alt) or @alt=""]')->length,
             ];
 
-            // --- SEOBILITY ISSUE LOGIC ---
+            // --- 📊 PILLAR SCORING LOGIC ---
             $issues = [];
+            
             // Tech Issues
             if ($loadTime > 0.5) $issues[] = ['pillar' => 'tech', 'type' => 'warning', 'msg' => 'Long response time'];
             if (empty($seo['description'])) $issues[] = ['pillar' => 'tech', 'type' => 'critical', 'msg' => 'Meta description missing'];
-            if (strlen($seo['title']) > 70) $issues[] = ['pillar' => 'tech', 'type' => 'warning', 'msg' => 'Title too long'];
             
             // Structure Issues
             if (count($structure['h1']) != 1) $issues[] = ['pillar' => 'struct', 'type' => 'critical', 'msg' => 'H1 heading problems'];
-            if ($depth > 3) $issues[] = ['pillar' => 'struct', 'type' => 'notice', 'msg' => 'High page depth'];
             
             // Content Issues
-            if ($wordCount < 300) $issues[] = ['pillar' => 'content', 'type' => 'warning', 'msg' => 'Thin content (less than 300 words)'];
-            if ($content['kw_consistency_score'] < 50) $issues[] = ['pillar' => 'content', 'type' => 'notice', 'msg' => 'Title keywords not used in text'];
+            if ($wordCount < 300) $issues[] = ['pillar' => 'content', 'type' => 'warning', 'msg' => 'Thin content'];
 
-            // Individual Pillar Scores
             $pillarScores = $this->calculatePillarScores($issues);
 
-            // 4. Update Page
+            // 1. Update individual page record
             $this->page->update([
                 'title' => $seo['title'],
                 'word_count' => $wordCount,
@@ -123,11 +124,11 @@ class RunAdvancedAudit implements ShouldQueue
                 'status' => 'audited'
             ]);
 
-            // 🌟 5. Sync with Audit Summary
+            // 2. Aggregate everything into the main Audit report
             $this->syncAuditProgress();
 
         } catch (\Exception $e) {
-            Log::error("Postmortem Failed for " . $this->page->url . " : " . $e->getMessage());
+            Log::error("Audit Failed for " . $this->page->url . " : " . $e->getMessage());
             $this->page->update(['status' => 'failed']);
         }
     }
@@ -145,32 +146,42 @@ class RunAdvancedAudit implements ShouldQueue
     private function syncAuditProgress()
     {
         $auditId = $this->page->audit_id;
-        if (!$auditId) return;
-
         $pages = ProjectPage::where('audit_id', $auditId)->where('status', 'audited')->get();
         if ($pages->isEmpty()) return;
 
-        // Pillar Averages
+        // Pillar averages
         $techAvg = $pages->avg(fn($p) => json_decode($p->full_audit_data)->pillar_scores->tech);
         $structAvg = $pages->avg(fn($p) => json_decode($p->full_audit_data)->pillar_scores->struct);
         $contentAvg = $pages->avg(fn($p) => json_decode($p->full_audit_data)->pillar_scores->content);
 
-        // Meta Statistics (Seobility Table)
-        $duplicateTitles = $pages->groupBy('title')->filter(fn($g) => $g->count() > 1)->flatten()->count();
-        $slowPages = $pages->where('load_time', '>', 0.5)->count();
+        // Seobility Summary Stats
+        $duplicateTitles = $pages->groupBy('title')->filter(fn($g) => $g->count() > 1 && !empty($g->first()->title))->flatten()->count();
+        $missingDesc = $pages->filter(fn($p) => empty(json_decode($p->full_audit_data)->seo->description ?? ''))->count();
+        
+        $techReport = [
+            'meta' => [
+                'duplicate_titles' => $duplicateTitles,
+                'missing_descriptions' => $missingDesc,
+                'problematic_h1' => $pages->filter(fn($p) => count(json_decode($p->full_audit_data)->structure->h1 ?? []) != 1)->count(),
+            ],
+            'crawling' => [
+                'pages_accessed' => $pages->count(),
+                'avg_response_time' => round($pages->avg('load_time'), 3),
+            ],
+            'distribution' => [
+                'fast' => $pages->where('load_time', '<=', 0.2)->count(),
+                'medium' => $pages->where('load_time', '>', 0.2)->where('load_time', '<=', 0.5)->count(),
+                'slow' => $pages->where('load_time', '>', 0.5)->count(),
+            ]
+        ];
 
         Audit::where('id', $auditId)->update([
             'score_tech' => round($techAvg),
             'score_structure' => round($structAvg),
             'score_content' => round($contentAvg),
             'overall_health_score' => round(($techAvg + $structAvg + $contentAvg) / 3),
+            'tech_meta_data' => json_encode($techReport),
             'pages_scanned' => $pages->count(),
-            'tech_meta_data' => json_encode([
-                'duplicate_titles' => $duplicateTitles,
-                'slow_pages' => $slowPages,
-                'avg_load_time' => round($pages->avg('load_time'), 2),
-                'status_200' => $pages->count() // Add logic for other codes if needed
-            ]),
             'status' => 'completed'
         ]);
     }

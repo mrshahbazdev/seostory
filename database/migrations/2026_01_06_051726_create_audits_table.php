@@ -13,17 +13,31 @@ return new class extends Migration
     {
         Schema::create('audits', function (Blueprint $table) {
             $table->id();
-            // Kyunki projects table ki ID UUID hai, isliye yahan foreignUuid use karein
+            // Project ID (UUID)
             $table->foreignUuid('project_id')->constrained()->onDelete('cascade');
             
+            // Audit Meta Info
             $table->string('type')->default('self'); // self ya competitor
-            $table->foreignUuid('competitor_id')->nullable(); // Agar competitor ka audit ho
+            $table->foreignUuid('competitor_id')->nullable(); 
+            $table->string('status')->default('pending'); // pending, processing, completed, failed
             
+            // 📊 Pillar Scores (Seobility Style)
             $table->integer('overall_health_score')->default(0);
+            $table->integer('score_tech')->default(0);
+            $table->integer('score_structure')->default(0);
+            $table->integer('score_content')->default(0);
+            
+            // 📈 Quantitative Stats
             $table->integer('pages_scanned')->default(0);
             $table->integer('critical_issues')->default(0);
-            $table->string('status')->default('pending'); // pending, crawling, completed
-            $table->json('summary_data')->nullable();
+            
+            // 🗄️ Deep Analysis Data (JSON Storage)
+            // Isme hum Duplicate titles, Response distributions, aur Link depth details save karenge
+            $table->json('tech_meta_data')->nullable(); 
+            $table->json('structure_data')->nullable();
+            $table->json('content_data')->nullable();
+            $table->json('summary_data')->nullable(); // For general overview
+            
             $table->timestamps();
         });
     }
