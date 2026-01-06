@@ -1,6 +1,6 @@
 <div class="relative min-h-screen">
     {{-- Main Dashboard: Blur if not verified --}}
-    <div wire:poll.5s class="max-w-[1600px] mx-auto pb-20 transition-all duration-700 {{ !$project->is_verified ? 'filter blur-xl pointer-events-none select-none opacity-50' : '' }}">
+    <div wire:poll.15s class="max-w-[1600px] mx-auto pb-20 transition-all duration-700 {{ !$project->is_verified ? 'filter blur-xl pointer-events-none select-none opacity-50' : '' }}">
         
         <nav class="flex mb-8 text-sm font-medium text-slate-400 space-x-2 px-4">
             <a href="/dashboard" class="hover:text-indigo-600 transition">Dashboard</a>
