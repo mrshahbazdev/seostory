@@ -206,31 +206,46 @@
                         </thead>
                         <tbody>
                             @foreach($selectedAudit->projectPages as $page)
-                                <tr class="bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors">
+                                @php $data = json_decode($page->full_audit_data, true); @endphp
+                                
+                                <tr class="bg-slate-50/50 rounded-2xl hover:bg-slate-100 transition-all">
                                     <td class="px-6 py-4">
-                                        <span class="text-xs font-bold text-slate-600 break-all">{{ Str::limit($page->url, 60) }}</span>
+                                        <div class="flex flex-col">
+                                            <span class="text-xs font-black text-slate-700 truncate max-w-xs">{{ $page->url }}</span>
+                                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{{ $page->title ?? 'No Title Found' }}</span>
+                                        </div>
                                     </td>
-                                    <td class="px-6 py-4">
+                                    <td class="px-6 py-4 text-center">
                                         <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest {{ $page->status == 'audited' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500' }}">
                                             {{ $page->status }}
                                         </span>
                                     </td>
                                     <td class="px-6 py-4">
-                                        <span class="text-xs font-black text-slate-700">{{ $page->load_time ?? '0.00' }}s</span>
+                                        <span class="text-xs font-black {{ $page->load_time > 2 ? 'text-rose-500' : 'text-slate-700' }}">
+                                            {{ $page->load_time ?? '0.00' }}s
+                                        </span>
                                     </td>
                                     <td class="px-6 py-4">
                                         <div class="flex items-center space-x-2">
-                                            <div class="flex-1 h-1.5 w-12 bg-slate-200 rounded-full overflow-hidden">
+                                            <span class="text-[10px] font-black">{{ $page->health_score }}%</span>
+                                            <div class="h-1.5 w-12 bg-slate-200 rounded-full overflow-hidden">
                                                 <div class="h-full bg-indigo-500" style="width: {{ $page->health_score }}%"></div>
                                             </div>
-                                            <span class="text-[10px] font-black">{{ $page->health_score }}%</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4">
-                                        @php $data = json_decode($page->full_audit_data, true); @endphp
-                                        <span class="text-xs font-bold {{ count($data['issues'] ?? []) > 0 ? 'text-rose-500' : 'text-emerald-500' }}">
-                                            {{ count($data['issues'] ?? []) }} Issues Found
-                                        </span>
+                                        {{-- Issues Detail Section --}}
+                                        <div class="flex flex-col gap-1">
+                                            @if(isset($data['issues']) && count($data['issues']) > 0)
+                                                @foreach($data['issues'] as $issue)
+                                                    <div class="flex items-center text-[9px] font-bold py-1 px-2 rounded-lg {{ $issue['type'] == 'critical' ? 'bg-rose-50 text-rose-600' : 'bg-amber-50 text-amber-600' }}">
+                                                        <span class="mr-1">⚠️</span> {{ $issue['msg'] }}
+                                                    </div>
+                                                @endforeach
+                                            @else
+                                                <span class="text-[9px] font-black text-emerald-500 uppercase tracking-widest">✅ Perfect SEO</span>
+                                            @endif
+                                        </div>
                                     </td>
                                 </tr>
                             @endforeach
