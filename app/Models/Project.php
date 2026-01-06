@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Model;
 use App\Models\Team;
 use App\Models\Competitor;
 use App\Models\User;
+use App\Models\Audit;
 class Project extends Model
 {
     use HasUuid;
@@ -29,6 +30,14 @@ class Project extends Model
     {
         return $this->belongsTo(User::class);
     }
+    public function audits()
+    {
+        return $this->hasMany(Audit::class);
+    }
+
+    /**
+     * Project ke saare Competitors
+     */
     public function competitors()
     {
         return $this->hasMany(Competitor::class);
