@@ -27,11 +27,25 @@ class ProjectDetail extends Component
     public $activeAnalysis = '';
     public $showAuditModal = false;
     public $selectedAudit = null;
+    public $showPageDetailModal = false;
+    public $activePageData = null;
     public function mount(Project $project)
     {
         $this->project = $project;
     }
-
+    public function inspectPage($pageId)
+    {
+        $page = \App\Models\ProjectPage::findOrFail($pageId);
+        $this->activePageData = json_decode($page->full_audit_data, true);
+        // Hum page ki basic info bhi add kar dete hain summary ke liye
+        $this->activePageData['summary'] = [
+            'url' => $page->url,
+            'title' => $page->title,
+            'health' => $page->health_score,
+            'load_time' => $page->load_time
+        ];
+        $this->showPageDetailModal = true;
+    }
     /**
      * 🔐 Site Verification Logic
      */

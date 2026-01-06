@@ -209,10 +209,10 @@
                                 @php $data = json_decode($page->full_audit_data, true); @endphp
                                 
                                 <tr class="bg-slate-50/50 rounded-2xl hover:bg-slate-100 transition-all">
-                                    <td class="px-6 py-4">
+                                    <td class="px-6 py-4 cursor-pointer group" wire:click="inspectPage({{ $page->id }})">
                                         <div class="flex flex-col">
-                                            <span class="text-xs font-black text-slate-700 truncate max-w-xs">{{ $page->url }}</span>
-                                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{{ $page->title ?? 'No Title Found' }}</span>
+                                            <span class="text-xs font-black text-indigo-600 group-hover:underline truncate max-w-xs">{{ $page->url }}</span>
+                                            <span class="text-[9px] text-slate-400 font-bold uppercase tracking-tighter">{{ $page->title ?? 'No Title' }}</span>
                                         </div>
                                     </td>
                                     <td class="px-6 py-4 text-center">
@@ -255,6 +255,110 @@
 
                 <div class="p-10 bg-slate-50 border-t border-slate-100 flex justify-end">
                     <button wire:click="$set('showAuditModal', false)" class="px-10 py-4 bg-slate-900 text-white rounded-3xl font-black uppercase text-xs tracking-widest">Close Postmortem</button>
+                </div>
+            </div>
+        </div>
+    @endif
+    @if($showPageDetailModal && $activePageData)
+        <div class="fixed inset-0 bg-slate-900/95 backdrop-blur-2xl z-[1100] flex items-center justify-center p-4">
+            <div class="bg-white w-full max-w-4xl rounded-[3rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col">
+                
+                <div class="p-8 border-b border-slate-100 flex justify-between items-center bg-indigo-600 text-white">
+                    <div>
+                        <h3 class="text-xl font-black uppercase tracking-tighter italic">Page Deep Dive</h3>
+                        <p class="text-indigo-100 text-xs font-medium">{{ $activePageData['summary']['url'] }}</p>
+                    </div>
+                    <button wire:click="$set('showPageDetailModal', false)" class="text-white hover:rotate-90 transition-transform">
+                        <svg class="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="p-8 overflow-y-auto custom-scrollbar space-y-8">
+                    
+                    <div class="grid grid-cols-4 gap-4">
+                        <div class="p-4 bg-slate-50 rounded-3xl border border-slate-100 text-center">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Health</p>
+                            <p class="text-xl font-black text-indigo-600">{{ $activePageData['summary']['health'] }}%</p>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-3xl border border-slate-100 text-center">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Words</p>
+                            <p class="text-xl font-black text-slate-800">{{ $activePageData['content']['word_count'] ?? 0 }}</p>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-3xl border border-slate-100 text-center">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Internal Links</p>
+                            <p class="text-xl font-black text-slate-800">{{ $activePageData['content']['internal_links'] ?? 0 }}</p>
+                        </div>
+                        <div class="p-4 bg-slate-50 rounded-3xl border border-slate-100 text-center">
+                            <p class="text-[8px] font-black text-slate-400 uppercase mb-1">Images</p>
+                            <p class="text-xl font-black text-slate-800">{{ $activePageData['content']['images_total'] ?? 0 }}</p>
+                        </div>
+                    </div>
+
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                        
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-black uppercase text-slate-400 border-b pb-2 tracking-widest">SEO Meta Tags</h4>
+                            <div class="space-y-3">
+                                <div>
+                                    <p class="text-[9px] font-black text-slate-400 uppercase">Title</p>
+                                    <p class="text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100">{{ $activePageData['seo']['title'] ?? 'N/A' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-black text-slate-400 uppercase">Description</p>
+                                    <p class="text-xs font-bold text-slate-700 bg-slate-50 p-3 rounded-xl border border-slate-100">{{ $activePageData['seo']['description'] ?? 'Missing meta description!' }}</p>
+                                </div>
+                                <div>
+                                    <p class="text-[9px] font-black text-slate-400 uppercase">Canonical</p>
+                                    <p class="text-[10px] font-mono text-indigo-600 truncate">{{ $activePageData['seo']['canonical'] ?? 'No canonical tag set' }}</p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="space-y-4">
+                            <h4 class="text-xs font-black uppercase text-slate-400 border-b pb-2 tracking-widest">Heading Architecture</h4>
+                            <div class="max-h-48 overflow-y-auto space-y-2 pr-2">
+                                @if(!empty($activePageData['content']['h1']))
+                                    @foreach($activePageData['content']['h1'] as $h1)
+                                        <div class="p-2 bg-indigo-50 border border-indigo-100 rounded-lg text-xs font-bold text-indigo-700">H1: {{ $h1 }}</div>
+                                    @endforeach
+                                @endif
+                                @if(!empty($activePageData['content']['h2']))
+                                    @foreach($activePageData['content']['h2'] as $h2)
+                                        <div class="p-2 bg-slate-50 border border-slate-100 rounded-lg text-xs font-medium text-slate-600">H2: {{ $h2 }}</div>
+                                    @endforeach
+                                @endif
+                            </div>
+                        </div>
+
+                    </div>
+
+                    <div class="p-6 bg-slate-900 rounded-[2.5rem] text-white">
+                        <div class="grid grid-cols-2 gap-8">
+                            <div>
+                                <h4 class="text-[10px] font-black uppercase text-slate-500 mb-4 tracking-widest">Technical Payload</h4>
+                                <ul class="space-y-2 text-[11px] font-medium">
+                                    <li class="flex justify-between"><span>Server:</span> <span class="text-indigo-400 font-bold">{{ $activePageData['technical']['server'] ?? 'Unknown' }}</span></li>
+                                    <li class="flex justify-between"><span>Compression:</span> <span class="text-indigo-400 font-bold">{{ ($activePageData['technical']['is_compressed'] ?? false) ? 'GZIP/Brotli Active' : 'None' }}</span></li>
+                                    <li class="flex justify-between"><span>Status Code:</span> <span class="text-emerald-400 font-bold">200 OK</span></li>
+                                </ul>
+                            </div>
+                            <div>
+                                <h4 class="text-[10px] font-black uppercase text-slate-500 mb-4 tracking-widest">Schema Markup</h4>
+                                <div class="flex flex-wrap gap-2">
+                                    @forelse($activePageData['schemas'] ?? [] as $schema)
+                                        <span class="px-2 py-1 bg-slate-800 border border-slate-700 rounded-lg text-[10px] font-black text-indigo-300 italic">{{ is_array($schema) ? ($schema['@type'] ?? 'Item') : $schema }}</span>
+                                    @empty
+                                        <span class="text-[10px] text-slate-500 italic">No Schema Detected</span>
+                                    @endforelse
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                </div>
+                
+                <div class="p-6 border-t border-slate-100 flex justify-center bg-slate-50">
+                    <button wire:click="$set('showPageDetailModal', false)" class="px-8 py-3 bg-slate-900 text-white rounded-2xl font-black uppercase text-[10px] tracking-widest shadow-xl">Back to Overview</button>
                 </div>
             </div>
         </div>
