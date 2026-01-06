@@ -116,21 +116,36 @@ class ProjectDetail extends Component
         $token = $this->project->verification_token;
 
         try {
-            $response = \Illuminate\Support\Facades\Http::get($url);
+            // 1. User ki site fetch karein
+            $response = \Illuminate\Support\Facades\Http::timeout(15)->get($url);
+            
+            if ($response->failed()) {
+                session()->flash('error', 'Could not connect to your website. Check your URL.');
+                return;
+            }
+
             $html = $response->body();
 
-            // Check if token exists in HTML
-            if (str_contains($html, 'name="seostory-verify"') && str_contains($html, $token)) {
+            // 2. Meta tag dhoondain: <meta name="seostory-verify" content="...">
+            // Hum regex use kar rahe hain taake spaces ka masla na ho
+            $pattern = '/<meta[^>]*name=["\']seostory-verify["\'][^>]*content=["\']' . preg_quote($token, '/') . '["\'][^>]*>/i';
+
+            if (preg_match($pattern, $html)) {
+                // Success! Update database
                 $this->project->update([
                     'is_verified' => true,
-                    'verified_at' => now()
+                    'verified_at' => now(),
                 ]);
-                $this->dispatch('notify', 'Website Verified Successfully!');
+
+                session()->flash('message', 'Ownership verified! Surveillance engine initialized.');
             } else {
-                $this->dispatch('error', 'Verification tag not found. Please check and try again.');
+                // Tag nahi mila
+                session()->flash('error', 'Verification tag not found. Please ensure it is inside the <head> section.');
             }
+
         } catch (\Exception $e) {
-            $this->dispatch('error', 'Could not reach your website.');
+            \Log::error("Verification Error: " . $e->getMessage());
+            session()->flash('error', 'An error occurred during verification.');
         }
     }
     public function render()
