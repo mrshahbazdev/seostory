@@ -101,21 +101,26 @@ class ExtractInternalLinks implements ShouldQueue
      */
     private function normalizeUrl($href)
     {
-        if (empty($href) || str_starts_with($href, '#') || str_starts_with($href, 'javascript:') || str_starts_with($href, 'tel:') || str_starts_with($href, 'mailto:')) {
+        if (empty($href) || str_starts_with($href, '#') || str_starts_with($href, 'javascript:')) {
             return null;
         }
 
-        // Relative path ko Absolute banayein
+        // Relative ko full URL banayein
         if (str_starts_with($href, '/')) {
             $href = rtrim($this->project->url, '/') . $href;
         }
 
-        // Sirf Valid HTTP/S URLs rakhein
-        if (!filter_var($href, FILTER_VALIDATE_URL)) return null;
+        // 🌟 THE FIX: Sabse pehle trailing slash remove karein
+        $url = rtrim($href, '/');
 
-        // URL se anchors (#) aur trailing slashes nikal dein taake duplicate na hon
-        $url = explode('#', $href)[0];
-        return rtrim($url, '/');
+        // Query parameters (?) aur anchors (#) nikal dein taake same page bar bar na aaye
+        $url = explode('?', $url)[0];
+        $url = explode('#', $url)[0];
+
+        // Sirf valid internal links rakhein
+        if (!filter_var($url, FILTER_VALIDATE_URL)) return null;
+
+        return $url;
     }
 
     /**

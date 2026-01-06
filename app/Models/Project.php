@@ -21,7 +21,15 @@ class Project extends Model
         'is_verified', 
         'verified_at'
     ];
+    protected static function boot()
+    {
+        parent::boot();
 
+        static::creating(function ($project) {
+            // URL se trailing slash khatam kar dein taake hamesha 'clean' URL save ho
+            $project->url = rtrim($project->url, '/');
+        });
+    }
     public function team()
     {
         return $this->belongsTo(Team::class);
