@@ -139,16 +139,29 @@ class ProjectDetail extends Component
      */
     public function inspectPage($pageId)
     {
-        $page = ProjectPage::findOrFail($pageId);
-        $this->activePageData = json_decode($page->full_audit_data, true);
+        // Pehle purana data saaf karein taake user ko purana data nazar na aaye
+        $this->activePageData = null;
         
+        $page = \App\Models\ProjectPage::findOrFail($pageId);
+        
+        // JSON decode kar ke check karein ke data mojud hai
+        $auditData = json_decode($page->full_audit_data, true);
+        
+        if(!$auditData) {
+            $this->dispatch('notify', 'No detailed data found for this page.');
+            return;
+        }
+
+        $this->activePageData = $auditData;
+        
+        // Basic info lazmi add karein jo Modal mein use hoti hai
         $this->activePageData['summary'] = [
             'url' => $page->url,
             'title' => $page->title,
             'health' => $page->health_score,
             'load_time' => $page->load_time
         ];
-        
+
         $this->showPageDetailModal = true;
     }
 
