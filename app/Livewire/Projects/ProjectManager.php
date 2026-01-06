@@ -22,23 +22,21 @@ class ProjectManager extends Component
             'url' => 'required|url',
         ]);
 
-        // 1. Unique Verification Token banayyein
-        // Hum random string use kar rahe hain jo user meta tag mein daalega
+        // 1. Unique Verification Token generate karein
         $verificationToken = 'seostory_' . Str::random(32);
 
-        // 2. Project Create Karein
+        // 2. Project Create Karein (user_id ko nikal diya hai)
         Project::create([
             'name' => $this->name,
             'url' => $this->url,
-            'user_id' => Auth::id(),
-            'team_id' => Auth::user()->current_team_id, 
-            'verification_token' => $verificationToken, // Naya Column
-            'is_verified' => false, // Default false
+            'team_id' => Auth::user()->current_team_id, // Saara link team se hai
+            'verification_token' => $verificationToken,
+            'is_verified' => false,
         ]);
 
-        // 3. Form reset karein aur message dikhayein
+        // 3. Reset and Flash
         $this->reset(['name', 'url', 'showCreateForm']);
-        session()->flash('message', 'Project created successfully! Please verify ownership to start deep crawl.');
+        session()->flash('message', 'Project created! Please verify ownership.');
     }
 
     /**
