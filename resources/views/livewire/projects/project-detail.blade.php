@@ -46,21 +46,28 @@
                         <div class="p-4 bg-indigo-50 rounded-2xl border border-indigo-100">
                              <span class="text-[10px] font-black text-indigo-600 uppercase tracking-widest block mb-1">Last Score</span>
                              <span class="text-2xl font-black text-indigo-700 leading-none">
-                                {{ $project->audits()->where('type', 'self')->latest()->first()?->overall_health_score ?? '0' }}%
+                                {{ $audits->first()?->overall_health_score ?? '0' }}%
                              </span>
                         </div>
                     </div>
 
                     <div class="space-y-4">
-                        @forelse($project->audits()->where('type', 'self')->latest()->take(10)->get() as $audit)
+                        {{-- FIXED: Yahan controller se bheja gaya $audits variable use ho raha hai --}}
+                        @forelse($audits as $audit)
                             <div class="group flex items-center justify-between p-6 bg-slate-50/50 rounded-[2.5rem] border border-transparent hover:border-indigo-100 hover:bg-white transition-all shadow-hover cursor-pointer">
                                 <div class="flex items-center space-x-6">
+                                    {{-- FIXED: Loop numbering logic --}}
                                     <div class="w-12 h-12 rounded-2xl bg-white border border-slate-100 flex items-center justify-center font-black text-xs text-slate-400 group-hover:text-indigo-600 transition">
-                                        #{{ $loop->revindex + 1 }}
+                                        #{{ $audits->count() - $loop->index }}
                                     </div>
                                     <div>
                                         <h5 class="text-sm font-black text-slate-800 tracking-tight">{{ $audit->created_at->format('M d, Y • h:i A') }}</h5>
-                                        <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ $audit->pages_scanned }} Pages Audited</p>
+                                        <div class="flex items-center space-x-3">
+                                            <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ $audit->pages_scanned }} Pages Audited</p>
+                                            @if($audit->status === 'processing')
+                                                <span class="text-[8px] bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-black animate-pulse uppercase">Scanning...</span>
+                                            @endif
+                                        </div>
                                     </div>
                                 </div>
 
@@ -118,6 +125,7 @@
         </div>
     </div>
 
+    {{-- Verification Modal --}}
     @if(!$project->is_verified)
         <div class="fixed inset-0 z-[999] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-3xl">
             <div class="bg-white w-full max-w-2xl rounded-[4rem] shadow-2xl border border-indigo-100 overflow-hidden transform animate-in zoom-in duration-300">
@@ -153,6 +161,7 @@
         </div>
     @endif
 
+    {{-- AI Analysis Modal --}}
     @if($showAnalysisModal)
         <div class="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-[1000] flex items-center justify-center p-6">
             <div class="bg-white w-full max-w-5xl rounded-[4rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border border-indigo-100">
