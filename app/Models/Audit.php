@@ -3,8 +3,29 @@
 namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 
 class Audit extends Model
 {
-    //
+    use HasFactory;
+
+    // In columns ko mass assignment ke liye allow karein
+    protected $fillable = [
+        'project_id',
+        'type',
+        'competitor_id',
+        'overall_health_score',
+        'pages_scanned',
+        'critical_issues',
+        'status',
+        'summary_data'
+    ];
+
+    /**
+     * Relationship: Audit aik project se jurra hota hai
+     */
+    public function project()
+    {
+        return $this->belongsTo(Project::class);
+    }
 }
