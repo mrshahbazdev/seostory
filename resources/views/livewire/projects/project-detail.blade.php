@@ -78,7 +78,9 @@
                                         </span>
                                         <p class="text-[8px] font-black text-slate-300 uppercase italic">Health Score</p>
                                     </div>
-                                    <button class="px-6 py-2 bg-slate-900 text-white text-[10px] font-black uppercase rounded-xl hover:bg-black transition">View Postmortem</button>
+                                    <button wire:click="viewAudit({{ $audit->id }})" class="px-6 py-2 bg-slate-900 text-white text-[10px] font-black uppercase rounded-xl hover:bg-black transition">
+                                        View Postmortem
+                                    </button>
                                 </div>
                             </div>
                         @empty
@@ -173,6 +175,71 @@
                 </div>
                 <div class="p-12 overflow-y-auto custom-scrollbar bg-white prose prose-indigo max-w-none">
                     {!! Str::markdown($activeAnalysis) !!}
+                </div>
+            </div>
+        </div>
+    @endif
+    @if($showAuditModal && $selectedAudit)
+        <div class="fixed inset-0 bg-slate-900/90 backdrop-blur-xl z-[1000] flex items-center justify-center p-6">
+            <div class="bg-white w-full max-w-6xl rounded-[4rem] shadow-2xl overflow-hidden max-h-[90vh] flex flex-col border border-indigo-100">
+                
+                <div class="p-10 border-b border-slate-100 flex items-center justify-between bg-slate-50/50">
+                    <div>
+                        <h2 class="text-3xl font-black text-slate-900 uppercase tracking-tighter italic">Audit Postmortem: #{{ $selectedAudit->id }}</h2>
+                        <p class="text-slate-500 font-bold text-xs uppercase tracking-widest">{{ $selectedAudit->created_at->format('M d, Y') }} — {{ $selectedAudit->pages_scanned }} Pages Analyzed</p>
+                    </div>
+                    <button wire:click="$set('showAuditModal', false)" class="p-4 bg-white shadow-sm rounded-2xl hover:bg-rose-50 hover:text-rose-500 transition border border-slate-100">
+                        <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg>
+                    </button>
+                </div>
+
+                <div class="p-8 overflow-y-auto custom-scrollbar flex-1">
+                    <table class="w-full text-left border-separate border-spacing-y-3">
+                        <thead>
+                            <tr class="text-[10px] font-black text-slate-400 uppercase tracking-[0.2em]">
+                                <th class="px-6 pb-4">Page URL</th>
+                                <th class="px-6 pb-4">Status</th>
+                                <th class="px-6 pb-4">Load Time</th>
+                                <th class="px-6 pb-4">Health</th>
+                                <th class="px-6 pb-4">Issues</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($selectedAudit->projectPages as $page)
+                                <tr class="bg-slate-50/50 rounded-2xl hover:bg-slate-50 transition-colors">
+                                    <td class="px-6 py-4">
+                                        <span class="text-xs font-bold text-slate-600 break-all">{{ Str::limit($page->url, 60) }}</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="px-3 py-1 rounded-full text-[9px] font-black uppercase tracking-widest {{ $page->status == 'audited' ? 'bg-emerald-100 text-emerald-600' : 'bg-slate-200 text-slate-500' }}">
+                                            {{ $page->status }}
+                                        </span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <span class="text-xs font-black text-slate-700">{{ $page->load_time ?? '0.00' }}s</span>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        <div class="flex items-center space-x-2">
+                                            <div class="flex-1 h-1.5 w-12 bg-slate-200 rounded-full overflow-hidden">
+                                                <div class="h-full bg-indigo-500" style="width: {{ $page->health_score }}%"></div>
+                                            </div>
+                                            <span class="text-[10px] font-black">{{ $page->health_score }}%</span>
+                                        </div>
+                                    </td>
+                                    <td class="px-6 py-4">
+                                        @php $data = json_decode($page->full_audit_data, true); @endphp
+                                        <span class="text-xs font-bold {{ count($data['issues'] ?? []) > 0 ? 'text-rose-500' : 'text-emerald-500' }}">
+                                            {{ count($data['issues'] ?? []) }} Issues Found
+                                        </span>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                <div class="p-10 bg-slate-50 border-t border-slate-100 flex justify-end">
+                    <button wire:click="$set('showAuditModal', false)" class="px-10 py-4 bg-slate-900 text-white rounded-3xl font-black uppercase text-xs tracking-widest">Close Postmortem</button>
                 </div>
             </div>
         </div>

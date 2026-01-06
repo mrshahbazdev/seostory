@@ -4,6 +4,8 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use App\Models\Project;
+use App\Models\ProjectPage;
 
 class Audit extends Model
 {
@@ -27,5 +29,9 @@ class Audit extends Model
     public function project()
     {
         return $this->belongsTo(Project::class);
+    }
+        public function projectPages()
+    {
+        return $this->hasMany(ProjectPage::class);
     }
 }

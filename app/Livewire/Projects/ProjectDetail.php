@@ -25,7 +25,8 @@ class ProjectDetail extends Component
     // UI States
     public $showAnalysisModal = false;
     public $activeAnalysis = '';
-
+    public $showAuditModal = false;
+    public $selectedAudit = null;
     public function mount(Project $project)
     {
         $this->project = $project;
@@ -165,7 +166,12 @@ class ProjectDetail extends Component
         $this->activeAnalysis = $competitor->metadata['analysis'] ?? 'No analysis available yet.';
         $this->showAnalysisModal = true;
     }
-
+    public function viewAudit($auditId)
+    {
+        // Specific audit load karein uske pages ke sath
+        $this->selectedAudit = Audit::with('projectPages')->findOrFail($auditId);
+        $this->showAuditModal = true;
+    }
     public function render()
     {
         return view('livewire.projects.project-detail', [
