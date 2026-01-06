@@ -11,7 +11,15 @@ class Project extends Model
 {
     use HasUuid;
 
-    protected $fillable = ['name', 'url', 'team_id'];
+    protected $fillable = [
+        'name', 
+        'url', 
+        'user_id', 
+        'team_id', 
+        'verification_token', 
+        'is_verified', 
+        'verified_at'
+    ];
 
     public function team()
     {

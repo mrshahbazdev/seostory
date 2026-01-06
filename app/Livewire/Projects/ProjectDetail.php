@@ -110,7 +110,29 @@ class ProjectDetail extends Component
         $this->activeAnalysis = $competitor->metadata['analysis'] ?? 'No analysis available yet.';
         $this->showAnalysisModal = true;
     }
+    public function verifySite()
+    {
+        $url = $this->project->url;
+        $token = $this->project->verification_token;
 
+        try {
+            $response = \Illuminate\Support\Facades\Http::get($url);
+            $html = $response->body();
+
+            // Check if token exists in HTML
+            if (str_contains($html, 'name="seostory-verify"') && str_contains($html, $token)) {
+                $this->project->update([
+                    'is_verified' => true,
+                    'verified_at' => now()
+                ]);
+                $this->dispatch('notify', 'Website Verified Successfully!');
+            } else {
+                $this->dispatch('error', 'Verification tag not found. Please check and try again.');
+            }
+        } catch (\Exception $e) {
+            $this->dispatch('error', 'Could not reach your website.');
+        }
+    }
     public function render()
     {
         return view('livewire.projects.project-detail', [
