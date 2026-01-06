@@ -184,8 +184,15 @@
                             <div class="text-sm text-blue-700 font-medium">Total Audits</div>
                         </div>
                         <div class="bg-green-50 rounded-xl p-4">
-                            <div class="text-2xl font-bold text-green-600">{{ $project->pages->count() }}</div>
-                            <div class="text-sm text-green-700 font-medium">Pages Indexed</div>
+                            {{-- FIXED: Check if pages relationship exists before counting --}}
+                            @php
+                                $pageCount = 0;
+                                foreach($audits as $audit) {
+                                    $pageCount += $audit->projectPages ? $audit->projectPages->count() : 0;
+                                }
+                            @endphp
+                            <div class="text-2xl font-bold text-green-600">{{ $pageCount }}</div>
+                            <div class="text-sm text-green-700 font-medium">Pages Scanned</div>
                         </div>
                     </div>
                 </div>
@@ -262,42 +269,53 @@
                                 </tr>
                             </thead>
                             <tbody class="bg-white divide-y divide-gray-200">
-                                @foreach($selectedAudit->projectPages as $page)
-                                    @php $data = json_decode($page->full_audit_data, true); @endphp
-                                    <tr class="hover:bg-gray-50 cursor-pointer" wire:click="inspectPage({{ $page->id }})">
-                                        <td class="px-6 py-4">
-                                            <div class="text-sm font-medium text-gray-900 truncate max-w-xs">{{ $page->url }}</div>
-                                            <div class="text-xs text-gray-500">{{ $page->title ?? 'No title' }}</div>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <span class="px-2 py-1 text-xs font-medium rounded-full {{ $page->status == 'audited' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
-                                                {{ $page->status }}
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4 text-sm">
-                                            <span class="{{ $page->load_time > 2 ? 'text-red-600 font-medium' : 'text-gray-900' }}">
-                                                {{ $page->load_time ?? '0.00' }}s
-                                            </span>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            <div class="flex items-center">
-                                                <div class="w-24 bg-gray-200 rounded-full h-2 mr-2">
-                                                    <div class="bg-gradient-to-r {{ $page->health_score > 80 ? 'from-green-500 to-green-600' : ($page->health_score > 60 ? 'from-yellow-500 to-yellow-600' : 'from-red-500 to-red-600') }} h-2 rounded-full" style="width: {{ $page->health_score }}%"></div>
+                                {{-- FIXED: Check if projectPages exists --}}
+                                @if($selectedAudit->projectPages)
+                                    @foreach($selectedAudit->projectPages as $page)
+                                        @php 
+                                            $data = json_decode($page->full_audit_data ?? '{}', true);
+                                        @endphp
+                                        <tr class="hover:bg-gray-50 cursor-pointer" wire:click="inspectPage({{ $page->id }})">
+                                            <td class="px-6 py-4">
+                                                <div class="text-sm font-medium text-gray-900 truncate max-w-xs">{{ $page->url }}</div>
+                                                <div class="text-xs text-gray-500">{{ $page->title ?? 'No title' }}</div>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <span class="px-2 py-1 text-xs font-medium rounded-full {{ $page->status == 'audited' ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800' }}">
+                                                    {{ $page->status }}
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4 text-sm">
+                                                <span class="{{ ($page->load_time ?? 0) > 2 ? 'text-red-600 font-medium' : 'text-gray-900' }}">
+                                                    {{ $page->load_time ?? '0.00' }}s
+                                                </span>
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                <div class="flex items-center">
+                                                    <div class="w-24 bg-gray-200 rounded-full h-2 mr-2">
+                                                        <div class="bg-gradient-to-r {{ ($page->health_score ?? 0) > 80 ? 'from-green-500 to-green-600' : (($page->health_score ?? 0) > 60 ? 'from-yellow-500 to-yellow-600' : 'from-red-500 to-red-600') }} h-2 rounded-full" style="width: {{ $page->health_score ?? 0 }}%"></div>
+                                                    </div>
+                                                    <span class="text-sm font-medium">{{ $page->health_score ?? '0' }}%</span>
                                                 </div>
-                                                <span class="text-sm font-medium">{{ $page->health_score }}%</span>
-                                            </div>
-                                        </td>
-                                        <td class="px-6 py-4">
-                                            @if(isset($data['issues']) && count($data['issues']) > 0)
-                                                <div class="text-xs text-red-600 font-medium">
-                                                    {{ count($data['issues']) }} issues
-                                                </div>
-                                            @else
-                                                <span class="text-xs text-green-600 font-medium">✓ No issues</span>
-                                            @endif
+                                            </td>
+                                            <td class="px-6 py-4">
+                                                @if(isset($data['issues']) && count($data['issues']) > 0)
+                                                    <div class="text-xs text-red-600 font-medium">
+                                                        {{ count($data['issues']) }} issues
+                                                    </div>
+                                                @else
+                                                    <span class="text-xs text-green-600 font-medium">✓ No issues</span>
+                                                @endif
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                @else
+                                    <tr>
+                                        <td colspan="5" class="px-6 py-4 text-center text-gray-500">
+                                            No pages found for this audit.
                                         </td>
                                     </tr>
-                                @endforeach
+                                @endif
                             </tbody>
                         </table>
                     </div>
