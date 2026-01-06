@@ -130,6 +130,12 @@
                     </div>
 
                     <div class="flex flex-col gap-4">
+                        @if (session()->has('error'))
+                            <div class="mb-6 p-4 bg-rose-50 border border-rose-100 rounded-2xl flex items-center text-rose-600 text-xs font-bold italic">
+                                <svg class="w-4 h-4 mr-2" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7 4a1 1 0 11-2 0 1 1 0 012 0zm-1-9a1 1 0 00-1 1v4a1 1 0 102 0V6a1 1 0 00-1-1z" clip-rule="evenodd"></path></svg>
+                                {{ session('error') }}
+                            </div>
+                        @endif
                         <button wire:click="verifySite" wire:loading.attr="disabled" class="w-full py-6 bg-indigo-600 text-white rounded-[2rem] font-black uppercase tracking-[0.2em] text-sm hover:bg-indigo-700 shadow-2xl shadow-indigo-200 transition-all active:scale-95 flex items-center justify-center">
                             <span wire:loading.remove>Verify Ownership</span>
                             <span wire:loading class="flex items-center">

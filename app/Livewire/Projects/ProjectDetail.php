@@ -112,48 +112,61 @@ class ProjectDetail extends Component
     }
     public function verifySite()
     {
-        // 1. Project ki URL aur Token lein
         $url = $this->project->url;
         $token = $this->project->verification_token;
 
         try {
-            // 2. User ki website fetch karein (15 seconds timeout ke sath)
+            // 1. Website fetch karein
             $response = \Illuminate\Support\Facades\Http::timeout(15)
-                ->withHeaders(['User-Agent' => 'SEOsStory-Verification-Bot/1.0'])
+                ->withHeaders(['User-Agent' => 'SEOsStory-Audit-Bot/1.0'])
                 ->get($url);
 
             if ($response->failed()) {
-                session()->flash('error', 'Haqeeqatan site tak nahi pohanch sakay. Check your URL.');
+                session()->flash('error', 'Site unreachable. Please check if your URL is correct.');
                 return;
             }
 
             $html = $response->body();
 
-            // 3. Meta tag dhoondne ke liye Regex pattern
-            // Ye pattern dhoondega: <meta name="seostory-verify" content="TOKEN">
-            $pattern = '/<meta[^>]*name=["\']seostory-verify["\'][^>]*content=["\']' . preg_quote($token, '/') . '["\'][^>]*>/i';
+            // 2. DOM Document use karein taake exact Head section check ho sake
+            $dom = new \DOMDocument();
+            @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+            $head = $dom->getElementsByTagName('head')->item(0);
 
-            if (preg_match($pattern, $html)) {
-                // ✅ Success! Database update karein
+            if (!$head) {
+                session()->flash('error', 'Technical Error: Could not find <head> section on your website.');
+                return;
+            }
+
+            // 3. Head ke andar meta tag dhoondain
+            $verified = false;
+            $metas = $head->getElementsByTagName('meta');
+            
+            foreach ($metas as $meta) {
+                if ($meta->getAttribute('name') === 'seostory-verify' && 
+                    $meta->getAttribute('content') === $token) {
+                    $verified = true;
+                    break;
+                }
+            }
+
+            // 4. Final Result Handling
+            if ($verified) {
                 $this->project->update([
                     'is_verified' => true,
                     'verified_at' => now(),
                 ]);
-
-                // Success Notification
-                $this->dispatch('notify', 'Ownership Verified! Surveillance engine initialized.');
                 
-                // Foran Crawling shuru karne ke liye function call kar sakte hain
-                $this->startInitialAudit(); 
-                
+                // Success! Page refresh ho jayega aur blur khatam ho jayega
+                $this->dispatch('notify', 'Website Verified Successfully!'); 
             } else {
-                // ❌ Tag nahi mila
-                session()->flash('error', 'Verification tag nahi mila. Ensure it is in the <head> section.');
+                // SPECIFIC ERROR MESSAGE:
+                session()->flash('error', 'Verification failed: Meta tag is missing from your <head> section. Please double-check the token.');
             }
 
         } catch (\Exception $e) {
             \Log::error("Verification Error: " . $e->getMessage());
-            session()->flash('error', 'Technical error: Site unreachable or slow.');
+            session()->flash('error', 'Something went wrong. Make sure your site is public.');
         }
     }
     public function render()
