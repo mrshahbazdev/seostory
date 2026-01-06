@@ -112,40 +112,48 @@ class ProjectDetail extends Component
     }
     public function verifySite()
     {
+        // 1. Project ki URL aur Token lein
         $url = $this->project->url;
         $token = $this->project->verification_token;
 
         try {
-            // 1. User ki site fetch karein
-            $response = \Illuminate\Support\Facades\Http::timeout(15)->get($url);
-            
+            // 2. User ki website fetch karein (15 seconds timeout ke sath)
+            $response = \Illuminate\Support\Facades\Http::timeout(15)
+                ->withHeaders(['User-Agent' => 'SEOsStory-Verification-Bot/1.0'])
+                ->get($url);
+
             if ($response->failed()) {
-                session()->flash('error', 'Could not connect to your website. Check your URL.');
+                session()->flash('error', 'Haqeeqatan site tak nahi pohanch sakay. Check your URL.');
                 return;
             }
 
             $html = $response->body();
 
-            // 2. Meta tag dhoondain: <meta name="seostory-verify" content="...">
-            // Hum regex use kar rahe hain taake spaces ka masla na ho
+            // 3. Meta tag dhoondne ke liye Regex pattern
+            // Ye pattern dhoondega: <meta name="seostory-verify" content="TOKEN">
             $pattern = '/<meta[^>]*name=["\']seostory-verify["\'][^>]*content=["\']' . preg_quote($token, '/') . '["\'][^>]*>/i';
 
             if (preg_match($pattern, $html)) {
-                // Success! Update database
+                // ✅ Success! Database update karein
                 $this->project->update([
                     'is_verified' => true,
                     'verified_at' => now(),
                 ]);
 
-                session()->flash('message', 'Ownership verified! Surveillance engine initialized.');
+                // Success Notification
+                $this->dispatch('notify', 'Ownership Verified! Surveillance engine initialized.');
+                
+                // Foran Crawling shuru karne ke liye function call kar sakte hain
+                $this->startInitialAudit(); 
+                
             } else {
-                // Tag nahi mila
-                session()->flash('error', 'Verification tag not found. Please ensure it is inside the <head> section.');
+                // ❌ Tag nahi mila
+                session()->flash('error', 'Verification tag nahi mila. Ensure it is in the <head> section.');
             }
 
         } catch (\Exception $e) {
             \Log::error("Verification Error: " . $e->getMessage());
-            session()->flash('error', 'An error occurred during verification.');
+            session()->flash('error', 'Technical error: Site unreachable or slow.');
         }
     }
     public function render()
