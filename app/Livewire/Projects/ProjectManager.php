@@ -19,24 +19,25 @@ class ProjectManager extends Component
     {
         $this->validate([
             'name' => 'required|min:3',
-            'url' => 'required|url',
+            // 'unique:projects,url' ka matlab hai ke projects table ke url column mein ye unique ho
+            'url' => 'required|url|unique:projects,url', 
+        ], [
+            // Custom error message taake user ko samajh aaye
+            'url.unique' => 'This project URL already exists. Please use a different URL.',
         ]);
 
-        // 1. Unique Verification Token generate karein
-        $verificationToken = 'seostory_' . Str::random(32);
+        $token = 'seostory_' . bin2hex(random_bytes(16));
 
-        // 2. Project Create Karein (user_id ko nikal diya hai)
         Project::create([
             'name' => $this->name,
             'url' => $this->url,
-            'team_id' => Auth::user()->current_team_id, // Saara link team se hai
-            'verification_token' => $verificationToken,
+            'team_id' => Auth::user()->current_team_id,
+            'verification_token' => $token,
             'is_verified' => false,
         ]);
 
-        // 3. Reset and Flash
         $this->reset(['name', 'url', 'showCreateForm']);
-        session()->flash('message', 'Project created! Please verify ownership.');
+        session()->flash('message', 'Project created successfully!');
     }
 
     /**
