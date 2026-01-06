@@ -5,18 +5,24 @@ namespace App\Livewire\Projects;
 use Livewire\Component;
 use App\Models\Project;
 use App\Models\Competitor;
-use App\Models\CompetitorPage; // Naya Model
+use App\Models\CompetitorPage;
+use App\Models\Audit;
+use App\Models\ProjectPage;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
+use App\Jobs\ExtractInternalLinks;
+use App\Jobs\FetchCompetitorContent;
+use App\Jobs\AnalyzeCompetitorAI;
 
 class ProjectDetail extends Component
 {
     public Project $project;
-    public $comp_name, $comp_url;
     
-    // Sub-page scanning properties
+    // Form Inputs
+    public $comp_name, $comp_url;
     public $sub_page_url; 
-    public $selectedCompetitorId = null; 
-
+    
+    // UI States
     public $showAnalysisModal = false;
     public $activeAnalysis = '';
 
@@ -26,7 +32,81 @@ class ProjectDetail extends Component
     }
 
     /**
-     * Phase 3: Add Main Competitor (Main Domain)
+     * 🔐 Site Verification Logic
+     */
+    public function verifySite()
+    {
+        $url = $this->project->url;
+        $token = $this->project->verification_token;
+
+        try {
+            $response = Http::timeout(15)
+                ->withHeaders(['User-Agent' => 'SEOsStory-Audit-Bot/1.0'])
+                ->get($url);
+
+            if ($response->failed()) {
+                session()->flash('error', 'Site unreachable. Please check if your URL is correct.');
+                return;
+            }
+
+            $html = $response->body();
+            $dom = new \DOMDocument();
+            @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
+            $head = $dom->getElementsByTagName('head')->item(0);
+
+            if (!$head) {
+                session()->flash('error', 'Technical Error: Could not find <head> section.');
+                return;
+            }
+
+            $verified = false;
+            $metas = $head->getElementsByTagName('meta');
+            foreach ($metas as $meta) {
+                if ($meta->getAttribute('name') === 'seostory-verify' && 
+                    $meta->getAttribute('content') === $token) {
+                    $verified = true;
+                    break;
+                }
+            }
+
+            if ($verified) {
+                $this->project->update([
+                    'is_verified' => true,
+                    'verified_at' => now(),
+                ]);
+                $this->dispatch('notify', 'Website Verified Successfully!'); 
+            } else {
+                session()->flash('error', 'Verification failed: Meta tag missing from <head>.');
+            }
+
+        } catch (\Exception $e) {
+            Log::error("Verification Error: " . $e->getMessage());
+            session()->flash('error', 'Connection error. Make sure your site is public.');
+        }
+    }
+
+    /**
+     * ⚡ START SELF-AUDIT (Deep Scan of My Own Site)
+     * Isko user manually click karega taake bar bar credit/resource zaya na ho.
+     */
+    public function startSelfAudit()
+    {
+        // 1. Create a historical Audit record
+        $audit = Audit::create([
+            'project_id' => $this->project->id,
+            'type' => 'self',
+            'status' => 'processing',
+            'overall_health_score' => 0
+        ]);
+
+        // 2. Dispatch Background Crawler (Browser close safe)
+        ExtractInternalLinks::dispatch($this->project, $this->project->url, $audit->id);
+
+        $this->dispatch('notify', 'Deep Audit started! You can safely close the browser.');
+    }
+
+    /**
+     * 🕵️ ADD COMPETITOR (Main Domain Scan)
      */
     public function addCompetitor()
     {
@@ -41,67 +121,42 @@ class ProjectDetail extends Component
             'status' => 'pending'
         ]);
 
-        try {
-            // Hum job ko bhej rahe hain (False ka matlab hai ye main domain hai)
-            $fetchJob = new \App\Jobs\FetchCompetitorContent($competitor, false);
-            $fetchJob->handle();
-            
-            Log::info("Technical Scraping completed for main domain: " . $competitor->name);
-        } catch (\Exception $e) {
-            Log::error("Scraping Error: " . $e->getMessage());
-            $competitor->update(['status' => 'failed']);
-        }
+        // Background job for scraping competitor
+        FetchCompetitorContent::dispatch($competitor, false);
 
         $this->reset(['comp_name', 'comp_url']);
+        $this->dispatch('notify', 'Competitor added and tracking deployed!');
     }
 
     /**
-     * NEW: Scan Specific Sub-Page of a Competitor
+     * 🕸️ SCAN COMPETITOR SUB-PAGE
      */
     public function scanSubPage($competitorId)
     {
-        $this->validate([
-            'sub_page_url' => 'required|url',
-        ]);
+        $this->validate(['sub_page_url' => 'required|url']);
 
-        $competitor = Competitor::findOrFail($competitorId);
-
-        // Sub-page record create karein
         $page = CompetitorPage::create([
             'competitor_id' => $competitorId,
             'url' => $this->sub_page_url,
             'status' => 'pending'
         ]);
 
-        try {
-            // True ka matlab hai ye sub-page crawl ho raha hai
-            $fetchJob = new \App\Jobs\FetchCompetitorContent($page, true);
-            $fetchJob->handle();
-            
-            $this->reset('sub_page_url');
-            Log::info("Sub-page audit finished for: " . $page->url);
-        } catch (\Exception $e) {
-            Log::error("Sub-page Scan Error: " . $e->getMessage());
-            $page->update(['status' => 'failed']);
-        }
+        FetchCompetitorContent::dispatch($page, true);
+
+        $this->reset('sub_page_url');
+        $this->dispatch('notify', 'Sub-page audit queued!');
     }
 
     /**
-     * Phase 4: Run AI Analysis manually
+     * 🤖 RUN AI ANALYSIS (Competitor Insights)
      */
     public function runAI($id)
     {
         $competitor = Competitor::findOrFail($id);
         $competitor->update(['status' => 'analyzing']);
 
-        try {
-            $aiJob = new \App\Jobs\AnalyzeCompetitorAI($competitor);
-            $aiJob->handle();
-            Log::info("AI Analysis finished for: " . $competitor->name);
-        } catch (\Exception $e) {
-            Log::error("AI Manual Run Error: " . $e->getMessage());
-            $competitor->update(['status' => 'failed']);
-        }
+        AnalyzeCompetitorAI::dispatch($competitor);
+        $this->dispatch('notify', 'AI Engine is crunching competitor data...');
     }
 
     public function openAnalysis($id)
@@ -110,70 +165,13 @@ class ProjectDetail extends Component
         $this->activeAnalysis = $competitor->metadata['analysis'] ?? 'No analysis available yet.';
         $this->showAnalysisModal = true;
     }
-    public function verifySite()
-    {
-        $url = $this->project->url;
-        $token = $this->project->verification_token;
 
-        try {
-            // 1. Website fetch karein
-            $response = \Illuminate\Support\Facades\Http::timeout(15)
-                ->withHeaders(['User-Agent' => 'SEOsStory-Audit-Bot/1.0'])
-                ->get($url);
-
-            if ($response->failed()) {
-                session()->flash('error', 'Site unreachable. Please check if your URL is correct.');
-                return;
-            }
-
-            $html = $response->body();
-
-            // 2. DOM Document use karein taake exact Head section check ho sake
-            $dom = new \DOMDocument();
-            @$dom->loadHTML(mb_convert_encoding($html, 'HTML-ENTITIES', 'UTF-8'));
-            $head = $dom->getElementsByTagName('head')->item(0);
-
-            if (!$head) {
-                session()->flash('error', 'Technical Error: Could not find <head> section on your website.');
-                return;
-            }
-
-            // 3. Head ke andar meta tag dhoondain
-            $verified = false;
-            $metas = $head->getElementsByTagName('meta');
-            
-            foreach ($metas as $meta) {
-                if ($meta->getAttribute('name') === 'seostory-verify' && 
-                    $meta->getAttribute('content') === $token) {
-                    $verified = true;
-                    break;
-                }
-            }
-
-            // 4. Final Result Handling
-            if ($verified) {
-                $this->project->update([
-                    'is_verified' => true,
-                    'verified_at' => now(),
-                ]);
-                
-                // Success! Page refresh ho jayega aur blur khatam ho jayega
-                $this->dispatch('notify', 'Website Verified Successfully!'); 
-            } else {
-                // SPECIFIC ERROR MESSAGE:
-                session()->flash('error', 'Verification failed: Meta tag is missing from your <head> section. Please double-check the token.');
-            }
-
-        } catch (\Exception $e) {
-            \Log::error("Verification Error: " . $e->getMessage());
-            session()->flash('error', 'Something went wrong. Make sure your site is public.');
-        }
-    }
     public function render()
     {
         return view('livewire.projects.project-detail', [
-            // Eager loading pages taake query fast ho
-            'competitors' => $this->project->competitors()->with('pages')->latest()->get()
+            'competitors' => $this->project->competitors()->with('pages')->latest()->get(),
+            // Self-audit history fetch kar rahe hain
+            'audits' => $this->project->audits()->where('type', 'self')->latest()->take(10)->get()
         ])->layout('layouts.app');
     }
 }
