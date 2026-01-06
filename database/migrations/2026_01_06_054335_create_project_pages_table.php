@@ -14,12 +14,18 @@ return new class extends Migration
         Schema::create('project_pages', function (Blueprint $table) {
             $table->id();
             $table->foreignUuid('project_id')->constrained()->onDelete('cascade');
-            $table->unsignedBigInteger('audit_id')->nullable(); // Audit table ki ID simple integer hai
-            
+            $table->unsignedBigInteger('audit_id')->nullable();
             $table->string('url');
+            $table->string('title')->nullable();
+            $table->integer('word_count')->default(0);
             $table->string('status')->default('pending');
+            $table->integer('health_score')->default(100);
+            
+            // Advanced Columns yahan honay chahiyen:
             $table->decimal('load_time', 5, 2)->nullable();
             $table->json('full_audit_data')->nullable();
+            $table->json('schema_types')->nullable();
+            
             $table->timestamps();
         });
     }
