@@ -64,8 +64,12 @@
                                         <h5 class="text-sm font-black text-slate-800 tracking-tight">{{ $audit->created_at->format('M d, Y • h:i A') }}</h5>
                                         <div class="flex items-center space-x-3">
                                             <p class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">{{ $audit->pages_scanned }} Pages Audited</p>
+                                            {{-- Jahan History List mein status hai wahan ye change karein --}}
                                             @if($audit->status === 'processing')
-                                                <span class="text-[8px] bg-amber-100 text-amber-600 px-2 py-0.5 rounded-full font-black animate-pulse uppercase">Scanning...</span>
+                                                <button wire:click="openCrawlerStatus" class="flex items-center space-x-2 bg-amber-50 px-3 py-1 rounded-full border border-amber-100 group hover:bg-amber-100 transition">
+                                                    <span class="w-2 h-2 bg-amber-500 rounded-full animate-ping"></span>
+                                                    <span class="text-[9px] font-black text-amber-600 uppercase">Scanning Live...</span>
+                                                </button>
                                             @endif
                                         </div>
                                     </div>

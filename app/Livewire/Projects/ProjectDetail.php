@@ -29,9 +29,14 @@ class ProjectDetail extends Component
     public $selectedAudit = null;
     public $showPageDetailModal = false;
     public $activePageData = null;
+    public $showCrawlerModal = false;
     public function mount(Project $project)
     {
         $this->project = $project;
+    }
+    public function openCrawlerStatus()
+    {
+        $this->showCrawlerModal = true;
     }
     public function inspectPage($pageId)
     {
@@ -186,16 +191,26 @@ class ProjectDetail extends Component
         $this->selectedAudit = Audit::with('projectPages')->findOrFail($auditId);
         $this->showAuditModal = true;
     }
+
+
     public function render()
     {
-        return view('livewire.projects.project-detail', [
-            'competitors' => $this->project->competitors()->latest()->get(),
-            // Latest audits humesha fresh database se uthain
-            'audits' => \App\Models\Audit::where('project_id', $this->project->id)
-                            ->where('type', 'self')
+        // Latest Audit ID nikalain jo abhi processing mein hai
+        $activeAudit = $this->project->audits()->where('status', 'processing')->latest()->first();
+        
+        $livePages = [];
+        if ($activeAudit) {
+            $livePages = \App\Models\ProjectPage::where('audit_id', $activeAudit->id)
                             ->latest()
                             ->take(10)
-                            ->get()
+                            ->get();
+        }
+
+        return view('livewire.projects.project-detail', [
+            'competitors' => $this->project->competitors()->latest()->get(),
+            'audits' => $this->project->audits()->where('type', 'self')->latest()->take(10)->get(),
+            'livePages' => $livePages, // Ye live feed ke liye hai
+            'activeAudit' => $activeAudit
         ])->layout('layouts.app');
     }
 }
