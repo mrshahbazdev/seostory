@@ -149,24 +149,36 @@ class RunAdvancedAudit implements ShouldQueue
         $pages = ProjectPage::where('audit_id', $auditId)->where('status', 'audited')->get();
         if ($pages->isEmpty()) return;
 
-        // Pillar averages
-        $techAvg = $pages->avg(fn($p) => json_decode($p->full_audit_data)->pillar_scores->tech);
-        $structAvg = $pages->avg(fn($p) => json_decode($p->full_audit_data)->pillar_scores->struct);
-        $contentAvg = $pages->avg(fn($p) => json_decode($p->full_audit_data)->pillar_scores->content);
-
-        // Seobility Summary Stats
+        // A. Meta Information Analysis
         $duplicateTitles = $pages->groupBy('title')->filter(fn($g) => $g->count() > 1 && !empty($g->first()->title))->flatten()->count();
-        $missingDesc = $pages->filter(fn($p) => empty(json_decode($p->full_audit_data)->seo->description ?? ''))->count();
-        
-        $techReport = [
+        $duplicateDesc = $pages->groupBy(fn($p) => json_decode($p->full_audit_data)->seo->description ?? '')
+                            ->filter(fn($g) => $g->count() > 1 && !empty($g->first()->description))->flatten()->count();
+
+        // B. Page Optimization Analysis
+        $h1Problems = $pages->filter(fn($p) => count(json_decode($p->full_audit_data)->structure->h1 ?? []) != 1)->count();
+        $boldProblems = $pages->filter(fn($p) => (json_decode($p->full_audit_data)->structure->bold_count ?? 0) == 0)->count();
+        $missingAlt = $pages->sum(fn($p) => json_decode($p->full_audit_data)->content->images_missing_alt ?? 0);
+
+        // C. Crawing Analysis
+        $externalSites = $pages->sum(fn($p) => json_decode($p->full_audit_data)->structure->external_count ?? 0);
+
+        $fullTechData = [
+            'crawling' => [
+                'accessed' => $pages->count(),
+                'relevant' => $pages->count(), // simplify for now
+                'internal' => $pages->count(),
+                'external' => $externalSites,
+            ],
             'meta' => [
                 'duplicate_titles' => $duplicateTitles,
-                'missing_descriptions' => $missingDesc,
-                'problematic_h1' => $pages->filter(fn($p) => count(json_decode($p->full_audit_data)->structure->h1 ?? []) != 1)->count(),
+                'duplicate_descriptions' => $duplicateDesc,
+                'problematic_titles' => $pages->filter(fn($p) => strlen($p->title) > 70 || strlen($p->title) < 10)->count(),
             ],
-            'crawling' => [
-                'pages_accessed' => $pages->count(),
-                'avg_response_time' => round($pages->avg('load_time'), 3),
+            'optimization' => [
+                'h1_problems' => $h1Problems,
+                'bold_problems' => $boldProblems,
+                'missing_alt' => $missingAlt,
+                'frames' => $pages->filter(fn($p) => json_decode($p->full_audit_data)->technical->has_frames ?? false)->count(),
             ],
             'distribution' => [
                 'fast' => $pages->where('load_time', '<=', 0.2)->count(),
@@ -176,12 +188,8 @@ class RunAdvancedAudit implements ShouldQueue
         ];
 
         Audit::where('id', $auditId)->update([
-            'score_tech' => round($techAvg),
-            'score_structure' => round($structAvg),
-            'score_content' => round($contentAvg),
-            'overall_health_score' => round(($techAvg + $structAvg + $contentAvg) / 3),
-            'tech_meta_data' => json_encode($techReport),
-            'pages_scanned' => $pages->count(),
+            'tech_meta_data' => json_encode($fullTechData),
+            'score_tech' => $this->calculateSeobilityScore($fullTechData),
             'status' => 'completed'
         ]);
     }
