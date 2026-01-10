@@ -71,7 +71,7 @@
             </p>
 
             <div class="max-w-3xl mx-auto">
-                <form action="{{ route('register') }}"
+                <form action="{{ route('audit.check') }}" method="GET"
                     class="sm:flex items-center gap-2 bg-white/10 p-2 rounded-2xl backdrop-blur-sm border border-white/10">
                     <div class="relative flex-grow">
                         <div class="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">

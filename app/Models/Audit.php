@@ -13,10 +13,30 @@ class Audit extends Model
 
     // In columns ko mass assignment ke liye allow karein
     protected $fillable = [
-        'project_id', 'type', 'competitor_id', 'status',
-        'overall_health_score', 'score_tech', 'score_structure', 'score_content',
-        'pages_scanned', 'critical_issues',
-        'tech_meta_data', 'structure_data', 'content_data', 'summary_data'
+        'project_id',
+        'url',
+        'title',
+        'type',
+        'competitor_id',
+        'status',
+        'overall_health_score',
+        'score_tech',
+        'score_structure',
+        'score_content',
+        'score_meta',
+        'pages_scanned',
+        'critical_issues',
+        'tech_meta_data',
+        'structure_data',
+        'content_data',
+        'summary_data'
+    ];
+
+    protected $casts = [
+        'tech_meta_data' => 'array',
+        'structure_data' => 'array',
+        'content_data' => 'array',
+        'summary_data' => 'array',
     ];
 
     /**
@@ -26,7 +46,7 @@ class Audit extends Model
     {
         return $this->belongsTo(Project::class);
     }
-        public function projectPages()
+    public function projectPages()
     {
         return $this->hasMany(ProjectPage::class);
     }
