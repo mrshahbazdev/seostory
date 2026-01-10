@@ -13,8 +13,20 @@ export default {
 
     theme: {
         extend: {
+            colors: {
+                navy: {
+                    50: '#f0f4f8',
+                    100: '#d9e2ec',
+                    800: '#1a2b3c', // Sidebar/Header
+                    900: '#0f172a', // Deep background
+                },
+                'seo-green': {
+                    500: '#27ae60', // Primary Action
+                    600: '#219150', // Hover
+                }
+            },
             fontFamily: {
-                sans: ['Figtree', ...defaultTheme.fontFamily.sans],
+                sans: ['Plus Jakarta Sans', 'Figtree', ...defaultTheme.fontFamily.sans],
             },
         },
     },
