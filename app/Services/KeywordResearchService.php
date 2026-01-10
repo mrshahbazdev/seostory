@@ -26,9 +26,39 @@ class KeywordResearchService
             ];
         }
 
-        // 2. Generate Simulated Data
-        $data = $this->simulateMetrics($term);
+        // 2. Generate Data (Hybrid)
+        $simulatedMetrics = $this->simulateMetrics($term);
 
+        // Fetch REAL related keywords from Google
+        $realSuggestions = $this->fetchRealSuggestions($term);
+
+        // If Google fails (offline/rate limit), use fallback simulation
+        if (empty($realSuggestions)) {
+            // Fallback simulation logic (simple suffix appending)
+            // We can just rely on the simulateMetrics doing nothing for results, 
+            // OR manually add some if needed. For now, empty is fine or we re-add the suffix loop.
+            // Let's re-add the suffix loop purely as fallback if $realSuggestions is empty.
+            $suffixes = ['guide', 'tutorial', 'examples', 'best practices', 'tools', 'software', '2026', 'price', 'reviews'];
+            $hash = crc32($term);
+            for ($i = 0; $i < 5; $i++) {
+                $suffix = $suffixes[($hash + $i) % count($suffixes)];
+                $relatedTerm = "$term $suffix";
+                $relatedSim = $this->simulateMetrics($relatedTerm);
+                $realSuggestions[] = [
+                    'term' => $relatedTerm,
+                    'volume' => floor($simulatedMetrics['volume'] * 0.2),
+                    'difficulty' => max(0, $simulatedMetrics['difficulty'] - 20),
+                ];
+            }
+        }
+
+        $data = [
+            'term' => $term,
+            'volume' => $simulatedMetrics['volume'],
+            'difficulty' => $simulatedMetrics['difficulty'],
+            'cpc' => $simulatedMetrics['cpc'],
+            'results' => $realSuggestions
+        ];
         // 3. Cache Result
         Keyword::create([
             'term' => $term,
@@ -39,6 +69,45 @@ class KeywordResearchService
         ]);
 
         return $data;
+    }
+
+    /**
+     * Fetch real suggestions from Google Autocomplete.
+     */
+    private function fetchRealSuggestions(string $term): array
+    {
+        try {
+            // Google Autocomplete API (Free & Public)
+            $response = \Illuminate\Support\Facades\Http::get('http://suggestqueries.google.com/complete/search', [
+                'client' => 'firefox',
+                'q' => $term,
+            ]);
+
+            if ($response->successful()) {
+                $suggestions = $response->json()[1] ?? [];
+
+                // Limit to 10 suggestions
+                $suggestions = array_slice($suggestions, 0, 10);
+
+                $results = [];
+                foreach ($suggestions as $suggestion) {
+                    // Calculate "Mock" metrics for this "Real" keyword
+                    $simulated = $this->simulateMetrics($suggestion);
+                    $results[] = [
+                        'term' => $suggestion,
+                        'volume' => floor($simulated['volume'] * 0.8), // Slightly lower volume for long-tail
+                        'difficulty' => max(0, $simulated['difficulty'] - 10),
+                    ];
+                }
+
+                return $results;
+            }
+        } catch (\Exception $e) {
+            // Fallback to pure simulation if API fails
+            return [];
+        }
+
+        return [];
     }
 
     private function simulateMetrics(string $term): array
@@ -82,28 +151,17 @@ class KeywordResearchService
         }
         $cpc = $commercialIntent ? (abs($hash % 500) / 100) + 2 : (abs($hash % 100) / 100);
 
-        // RELATED KEYWORDS Logic:
-        // Generate variations
-        $related = [];
-        $suffixes = ['guide', 'tutorial', 'examples', 'best practices', 'tools', 'software', '2026', 'price', 'reviews'];
 
-        // Pick 5 random suffixes based on hash
-        for ($i = 0; $i < 5; $i++) {
-            $suffix = $suffixes[($hash + $i) % count($suffixes)];
-            $relatedTerm = "$term $suffix";
-            $related[] = [
-                'term' => $relatedTerm,
-                'volume' => floor($volume * 0.2), // Related usually lower volume
-                'difficulty' => max(0, $difficulty - 20), // And easier
-            ];
-        }
+        // RELATED KEYWORDS Logic:
+        // If Google API fails (or we are calling this recursively), returning empty related to prevent infinite loops
+        // The FETCH method handles the related list now.
 
         return [
             'term' => $term,
             'volume' => $volume,
             'difficulty' => $difficulty,
             'cpc' => round($cpc, 2),
-            'results' => $related
+            'results' => [] // Results populated by parent caller
         ];
     }
 }
