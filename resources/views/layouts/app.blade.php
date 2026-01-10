@@ -49,7 +49,7 @@
                         </svg>
                         Dashboard
                     </a>
-                    <a href="#"
+                    <a href="{{ route('keywords.research') }}"
                         class="group flex items-center px-4 py-3 text-sm font-medium rounded-lg text-slate-300 hover:bg-navy-900 hover:text-white transition-colors">
                         <svg class="mr-3 h-5 w-5 text-slate-500 group-hover:text-seo-green-500 transition-colors"
                             fill="none" stroke="currentColor" viewBox="0 0 24 24">

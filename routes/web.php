@@ -11,8 +11,11 @@ Route::get('/audit/check', \App\Livewire\Audit\Show::class)->name('audit.check')
 
 Route::middleware(['auth:sanctum', config('jetstream.auth_session'), 'verified'])->group(function () {
     Route::get('/dashboard', function () {
-        return view('dashboard'); })->name('dashboard');
+        return view('dashboard');
+    })->name('dashboard');
 
     // Naya Route Project Detail ke liye
     Route::get('/projects/{project}', ProjectDetail::class)->name('projects.show');
+
+    Route::get('/tools/keywords', \App\Livewire\Keywords\Research::class)->name('keywords.research');
 });
